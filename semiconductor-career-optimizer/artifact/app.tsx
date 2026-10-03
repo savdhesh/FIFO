@@ -9,6 +9,8 @@ import { acceptAllSafe, analyze, decide, finalDocs, generate, providerFor, saveL
 import { coverDocxBlob, coverLetterPdf, reportPdf, resumeDocxBlob, resumePdf } from "./exporters";
 import { extractBrowser } from "./extract";
 import { packName } from "../src/lib/export/names";
+import { auditProse } from "../src/lib/truth/truth";
+import { buildIndex } from "../src/lib/profile-index";
 
 declare const claude: any;
 const KEY = "sco.v1";
@@ -62,7 +64,7 @@ function App() {
       {toast && <div role={toast.tone === "err" ? "alert" : "status"} className={cx("mb-3 rounded-md border p-3 text-sm", toast.tone === "err" ? "border-red-300 bg-red-50 text-red-800" : "border-green-300 bg-green-50 text-green-800")}>{toast.text}</div>}
 
       {view === "profile" && <ProfileView profile={store.profile} setProfile={setProfile} provider={provider} run={run} say={say} claudeOn={!!transport} goAnalyze={() => setView("analyze")} />}
-      {view === "analyze" && <AnalyzeView profile={store.profile} run={run} say={say} onDone={(a) => { setStore((s) => ({ ...s, apps: [a, ...s.apps] })); setOpenId(a.id); setView("apps"); }} provider={provider} claudeOn={!!transport} />}
+      {view === "analyze" && <AnalyzeView profile={store.profile} run={run} say={say} onDone={(a: AppRecord) => { setStore((s) => ({ ...s, apps: [a, ...s.apps] })); setOpenId(a.id); setView("apps"); }} provider={provider} claudeOn={!!transport} />}
       {view === "apps" && !open && <AppsList apps={store.apps} open={setOpenId} />}
       {view === "apps" && open && store.profile && <AppDetail key={open.id} app={open} profile={store.profile} update={updateApp} back={() => setOpenId(null)} remove={() => { setStore((s) => ({ ...s, apps: s.apps.filter((x) => x.id !== open.id) })); setOpenId(null); }} provider={provider} run={run} say={say} downloads={downloads} />}
       {view === "settings" && <SettingsView store={store} setStore={setStore} downloads={downloads} say={say} claudeOn={!!sample} />}
@@ -161,27 +163,36 @@ function AnalyzeView({ profile, run, say, onDone, provider, claudeOn }: any) {
 }
 
 /* ---------- Applications ---------- */
-function AppsList({ apps, open }: { apps: AppRecord[]; open: (id: string) => void }) {
-  const avg = apps.length ? Math.round(apps.reduce((s, a) => s + a.match.overall, 0) / apps.length) : null;
+function AppsList({ apps: all, open }: { apps: AppRecord[]; open: (id: string) => void }) {
+  const [filter, setFilter] = useState("ALL");
+  const apps = filter === "ALL" ? all : all.filter((a) => a.status === filter);
+  const counts = new Map<string, number>(); for (const a of all) counts.set(a.status, (counts.get(a.status) ?? 0) + 1);
+  const week = Date.now() - 7 * 864e5, thisWeek = all.filter((a) => new Date(a.createdAt).getTime() > week).length;
+  const progressed = all.filter((a) => !["SAVED", "ANALYZED", "APPLYING"].includes(a.status));
+  const interviews = all.filter((a) => ["SCREENING", "TECHNICAL_ROUND", "HIRING_MANAGER", "FINAL_ROUND", "OFFER"].includes(a.status)).length;
+  const responded = progressed.filter((a) => !["APPLIED", "WITHDRAWN"].includes(a.status)).length;
+  const avg = all.length ? Math.round(all.reduce((s, a) => s + a.match.overall, 0) / all.length) : null;
   const gaps = new Map<string, number>(), skills = new Map<string, number>();
-  for (const a of apps) for (const r of a.match.requirements) { if (r.gap !== "none" && r.gap !== "keyword-only") gaps.set(r.requirement, (gaps.get(r.requirement) ?? 0) + 1); if (r.score >= 0.9 && r.type !== "experience" && r.type !== "education") skills.set(r.requirement, (skills.get(r.requirement) ?? 0) + 1); }
-  const top = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-  if (!apps.length) return <Card className="text-sm text-gray-600">No applications yet. Analyze a job to create one.</Card>;
+  for (const a of all) for (const r of a.match.requirements) { if (r.gap !== "none" && r.gap !== "keyword-only") gaps.set(r.requirement, (gaps.get(r.requirement) ?? 0) + 1); if (r.score >= 0.9 && r.type !== "experience" && r.type !== "education") skills.set(r.requirement, (skills.get(r.requirement) ?? 0) + 1); }
+  const top = (m: Map<string, number>) => [...m.entries()].sort((a: [string, number], b: [string, number]) => b[1] - a[1]).slice(0, 5);
+  if (!all.length) return <Card className="text-sm text-gray-600">No applications yet. Analyze a job to create one.</Card>;
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-4">
-        <Card><div className="text-xs uppercase text-gray-500">Applications</div><div className="font-mono text-2xl">{apps.length}</div></Card>
+        <Card><div className="text-xs uppercase text-gray-500">Applications · this week</div><div className="font-mono text-2xl">{all.length} · {thisWeek}</div></Card>
         <Card><div className="text-xs uppercase text-gray-500">Average match</div><div className="font-mono text-2xl">{avg}</div></Card>
         <Card><div className="text-xs uppercase text-gray-500">Top skills</div><div className="text-sm">{top(skills).map(([k]) => k).join(", ") || "–"}</div></Card>
         <Card><div className="text-xs uppercase text-gray-500">Frequent gaps</div><div className="text-sm">{top(gaps).map(([k]) => k).join(", ") || "–"}</div></Card>
       </div>
+      <div className="grid gap-3 md:grid-cols-3"><Card><div className="text-xs uppercase text-gray-500">Interviews</div><div className="font-mono text-2xl">{interviews}</div></Card><Card><div className="text-xs uppercase text-gray-500">Offers</div><div className="font-mono text-2xl">{counts.get("OFFER") ?? 0}</div></Card><Card><div className="text-xs uppercase text-gray-500">Response rate</div><div className="font-mono text-2xl">{progressed.length ? `${Math.round((responded / progressed.length) * 100)}%` : "–"}</div></Card></div>
+      <div className="flex flex-wrap gap-1" role="group" aria-label="Pipeline">{[["ALL", all.length] as [string, number], ...STATUSES.filter((st) => counts.has(st)).map((st) => [st, counts.get(st)!] as [string, number])].map(([st, n]) => <button key={st} onClick={() => setFilter(st)} className={cx("rounded-md border border-line px-2 py-1 text-xs", filter === st && "bg-ink text-white")}>{st === "ALL" ? "All" : st.replace(/_/g, " ")} <span className="font-mono">{n}</span></button>)}</div>
       <Card className="overflow-x-auto p-0"><table className="w-full text-sm"><thead className="border-b border-line text-left text-xs uppercase text-gray-500"><tr><th className="p-3">Role</th><th>Company</th><th>Match</th><th>Verdict</th><th>Status</th><th>Created</th></tr></thead>
         <tbody>{apps.map((a) => <tr key={a.id} className="border-b border-line last:border-0 hover:bg-gray-50"><td className="p-3"><button className="text-left underline" onClick={() => open(a.id)}>{a.roleTitle || "Untitled"}</button></td><td>{a.company}</td><td className="font-mono">{a.match.overall}</td><td><Badge tone={a.match.recommendation.verdict.includes("GAPS") ? "amber" : a.match.recommendation.verdict.match(/LOW|DO NOT/) ? "red" : "green"}>{a.match.recommendation.verdict}</Badge></td><td>{a.status.replace(/_/g, " ")}</td><td>{new Date(a.createdAt).toLocaleDateString()}</td></tr>)}</tbody></table></Card>
     </div>
   );
 }
 
-const TABS = ["Overview", "Requirements", "Skill Match", "Resume Changes", "Cover Letter", "Truth Audit", "Tracking"];
+const TABS = ["Overview", "Requirements", "Skill Match", "Resume Changes", "Cover Letter", "LinkedIn", "Recruiter Messages", "Truth Audit", "Tracking"];
 function AppDetail({ app: a, profile, update, back, remove, provider, run, say, downloads }: any) {
   const [tab, setTab] = useState("Overview");
   const doc = useMemo(() => { try { return a.tailored ? finalDocs(a, profile) : null; } catch { return null; } }, [a, profile]);
@@ -197,6 +208,8 @@ function AppDetail({ app: a, profile, update, back, remove, provider, run, say, 
       {tab === "Skill Match" && <SkillMatch a={a} />}
       {tab === "Resume Changes" && <ResumeChanges a={a} profile={profile} update={update} provider={provider} run={run} say={say} doc={doc} downloads={downloads} />}
       {tab === "Cover Letter" && <CoverLetterTab a={a} profile={profile} update={update} provider={provider} run={run} say={say} doc={doc} downloads={downloads} />}
+      {tab === "LinkedIn" && <LinkedInTab a={a} profile={profile} update={update} provider={provider} run={run} say={say} />}
+      {tab === "Recruiter Messages" && <OutreachTab a={a} profile={profile} update={update} provider={provider} run={run} say={say} />}
       {tab === "Truth Audit" && <TruthAudit a={a} doc={doc} profile={profile} downloads={downloads} say={say} />}
       {tab === "Tracking" && <Tracking a={a} update={update} remove={remove} say={say} />}
     </div>
@@ -277,10 +290,10 @@ function ResumeChanges({ a, profile, update, provider, run, say, doc, downloads 
           <div className="mb-2 flex flex-wrap items-center gap-2"><Badge>{c.section}</Badge><Badge tone={statusTone(c.status)}>{c.status}</Badge>{c.hallucination && <Badge tone="red">POTENTIAL HALLUCINATION</Badge>}<Badge tone={c.decision === "accepted" || c.decision === "edited" ? "green" : c.decision === "rejected" ? "gray" : "amber"}>{c.decision}</Badge></div>
           <div className="grid gap-3 md:grid-cols-2">
             <div><Label>Original</Label><p className="whitespace-pre-wrap rounded bg-gray-50 p-2 text-sm">{c.original || <span className="text-gray-400">(none)</span>}</p></div>
-            <div><Label>Proposed{c.decision === "edited" ? " (your edit)" : ""}</Label>{edit?.id === c.id ? <Textarea rows={4} value={edit.text} onChange={(e) => setEdit({ id: c.id, text: e.target.value })} /> : <p className="whitespace-pre-wrap rounded bg-green-50 p-2 text-sm">{c.decision === "edited" && c.finalText ? c.finalText : c.proposed}</p>}</div>
+            <div><Label>Proposed{c.decision === "edited" ? " (your edit)" : ""}</Label>{edit && edit.id === c.id ? <Textarea rows={4} value={edit.text} onChange={(e) => setEdit({ id: c.id, text: e.target.value })} /> : <p className="whitespace-pre-wrap rounded bg-green-50 p-2 text-sm">{c.decision === "edited" && c.finalText ? c.finalText : c.proposed}</p>}</div>
           </div>
           <p className="mt-2 text-sm text-gray-700"><b>Why:</b> {c.reason}</p><p className="text-xs text-gray-500"><b>Evidence:</b> {c.evidence}</p>
-          <div className="mt-3 flex gap-2">{edit?.id === c.id ? <><Button size="sm" onClick={() => act(c.id, "edited", edit.text)}>Save edit</Button><Button size="sm" variant="ghost" onClick={() => setEdit(null)}>Cancel</Button></> : <><Button size="sm" disabled={c.status === "UNSUPPORTED"} onClick={() => act(c.id, "accepted")}>Accept</Button><Button size="sm" variant="outline" onClick={() => act(c.id, "rejected")}>Reject</Button><Button size="sm" variant="ghost" onClick={() => setEdit({ id: c.id, text: c.decision === "edited" && c.finalText ? c.finalText : c.proposed })}>Edit</Button></>}</div>
+          <div className="mt-3 flex gap-2">{edit && edit.id === c.id ? <><Button size="sm" onClick={() => act(c.id, "edited", edit.text)}>Save edit</Button><Button size="sm" variant="ghost" onClick={() => setEdit(null)}>Cancel</Button></> : <><Button size="sm" disabled={c.status === "UNSUPPORTED"} onClick={() => act(c.id, "accepted")}>Accept</Button><Button size="sm" variant="outline" onClick={() => act(c.id, "rejected")}>Reject</Button><Button size="sm" variant="ghost" onClick={() => setEdit({ id: c.id, text: c.decision === "edited" && c.finalText ? c.finalText : c.proposed })}>Edit</Button></>}</div>
         </Card>
       ))}
       {doc && <Card><h3 className="mb-2 text-sm font-semibold">Resume as it will be exported</h3><ResumePreview r={doc.resume} /><div className="mt-4"><DownloadRow a={a} profile={profile} doc={doc} kinds={["resume-pdf", "resume-docx"]} downloads={downloads} say={say} /></div></Card>}
@@ -356,8 +369,80 @@ function Tracking({ a, update, remove, say }: any) {
         <div><Label htmlFor="t-rc">Recruiter contact</Label><Input id="t-rc" value={f.recruiterContact} onChange={set("recruiterContact")} /></div>
       </div>
       <div><Label htmlFor="t-notes">Notes</Label><Textarea id="t-notes" rows={4} value={f.notes} onChange={set("notes")} /></div>
-      <div className="flex items-center gap-3"><Button onClick={() => { update({ ...a, ...f }); say("ok", "Saved."); }}>Save</Button>{confirm ? <><Button variant="danger" onClick={remove}>Confirm delete</Button><Button variant="ghost" onClick={() => setConfirm(false)}>Cancel</Button></> : <Button variant="outline" onClick={() => setConfirm(true)}>Delete application</Button>}</div>
+      {(a.history?.length ?? 0) > 0 && <div><Label>Status history</Label><ol className="space-y-1 text-sm">{a.history!.map((h: any, i: number) => <li key={i} className="flex gap-3"><span className="font-mono text-xs text-gray-500">{new Date(h.at).toLocaleDateString()}</span>{h.status.replace(/_/g, " ")}</li>)}</ol></div>}
+      <div className="flex items-center gap-3"><Button onClick={() => { const changed = f.status !== a.status; update({ ...a, ...f, history: changed ? [...(a.history ?? []), { status: f.status, at: new Date().toISOString() }] : a.history }); say("ok", "Saved."); }}>Save</Button>{confirm ? <><Button variant="danger" onClick={remove}>Confirm delete</Button><Button variant="ghost" onClick={() => setConfirm(false)}>Cancel</Button></> : <Button variant="outline" onClick={() => setConfirm(true)}>Delete application</Button>}</div>
     </Card>
+  );
+}
+
+
+/* ---------- Phase 3: LinkedIn + recruiter messages ---------- */
+async function copy(text: string, say: any) {
+  try { await navigator.clipboard.writeText(text); say("ok", "Copied."); }
+  catch { say("err", "Copy was blocked here. Select the text and copy it manually."); }
+}
+const glyph = { present: "✓", related: "△", missing: "✗" } as const;
+
+function LinkedInTab({ a, profile, update, provider, run, say }: any) {
+  const [cur, setCur] = useState({ headline: "", about: "" });
+  const p = a.linkedin;
+  const gen = () => run("Building LinkedIn plan…", async () => update({ ...a, linkedin: await provider.optimizeLinkedIn(profile, a.jd, a.match, a.settings, { headline: cur.headline || undefined, about: cur.about || undefined }) }));
+  return (
+    <div className="space-y-4">
+      <Card className="space-y-3">
+        <p className="text-sm text-gray-700">LinkedIn is for discovery, the resume is for ATS parsing, so this plan leads with recruiter-search keywords and scope instead of copying resume bullets. Everything is drawn from your profile.</p>
+        <details><summary className="cursor-pointer text-sm underline">Paste your current LinkedIn headline and About to compare (optional)</summary>
+          <div className="mt-2 space-y-2"><div><Label htmlFor="li-h">Current headline</Label><Input id="li-h" value={cur.headline} onChange={(e) => setCur({ ...cur, headline: e.target.value })} /></div><div><Label htmlFor="li-a">Current About</Label><Textarea id="li-a" rows={5} value={cur.about} onChange={(e) => setCur({ ...cur, about: e.target.value })} /></div></div></details>
+        <Button onClick={gen}>{p ? "Rebuild plan" : "Build LinkedIn plan"}</Button>
+      </Card>
+      {p && <>
+        <Card><h3 className="mb-2 text-sm font-semibold">Recruiter-search keyword coverage</h3>
+          <div className="grid gap-x-6 gap-y-1 md:grid-cols-3">{p.keywordCoverage.map((k: any) => <div key={k.keyword} className="flex items-start gap-2 text-sm" title={k.note}><span className={cx("w-4 font-mono", k.state === "present" ? "text-green-800" : k.state === "related" ? "text-amber-800" : "text-red-800")}>{glyph[k.state as keyof typeof glyph]}</span>{k.keyword}</div>)}</div>
+          <p className="mt-2 text-xs text-gray-500">✓ in your profile · △ related background only (add the phrase only if you confirm you did it) · ✗ not in your profile (do not add)</p>
+          <h4 className="mb-1 mt-4 text-xs font-semibold uppercase text-gray-500">Title keywords</h4>
+          {p.titleKeywords.map((t: any) => <div key={t.keyword} className="flex items-start gap-2 text-sm"><span className={cx("w-4 font-mono", t.held ? "text-green-800" : "text-red-800")}>{t.held ? "✓" : "✗"}</span><span><b>{t.keyword}</b> <span className="text-gray-500">{t.note}</span></span></div>)}
+        </Card>
+        <Card className="space-y-3"><h3 className="text-sm font-semibold">Headline variants <span className="font-normal text-gray-500">(limit 220 characters)</span></h3>
+          {p.headlines.map((h: any) => <div key={h.kind} className="rounded-md border border-line p-3"><div className="mb-1 flex flex-wrap items-center gap-2"><b className="text-sm">{h.kind}</b><Badge tone={statusTone(h.status)}>{h.status}</Badge><span className="font-mono text-xs text-gray-500">{h.length}/220</span></div><p className="text-sm">{h.text}</p><Button size="sm" variant="outline" className="mt-2" onClick={() => copy(h.text, say)}>Copy</Button></div>)}
+          {p.skippedHeadlines.map((s: any) => <p key={s.kind} className="text-sm text-gray-500"><b>{s.kind}</b> not generated: {s.why}</p>)}
+        </Card>
+        <Card className="space-y-2"><h3 className="text-sm font-semibold">About</h3><Textarea readOnly rows={12} value={p.about.text} /><div className="flex items-center gap-3"><Button size="sm" variant="outline" onClick={() => copy(p.about.text, say)}>Copy</Button><span className="font-mono text-xs text-gray-500">{p.about.text.length}/2600</span></div></Card>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card><h3 className="mb-2 text-sm font-semibold">Skills order (top 50, from your profile)</h3><ol className="list-decimal pl-5 text-sm columns-2">{p.skills.map((k: string) => <li key={k}>{k}</li>)}</ol></Card>
+          <Card><h3 className="mb-2 text-sm font-semibold">Recruiter keywords to consider</h3>{p.missingKeywords.length ? p.missingKeywords.map((k: any) => <div key={k.keyword} className="border-b border-line py-2 text-sm last:border-0"><b>{k.keyword}</b><p className="text-gray-600">{k.why}</p></div>) : <p className="text-sm text-gray-500">No presentation gaps for this job.</p>}</Card>
+        </div>
+        <Card><h3 className="mb-2 text-sm font-semibold">Experience: lead with these</h3>{p.experience.map((e: any) => <div key={e.roleLabel} className="border-b border-line py-2 text-sm last:border-0"><b>{e.roleLabel}</b><ul className="mt-1 text-gray-700">{e.lead.map((b: string, i: number) => <li key={i}>{b}</li>)}</ul>{e.weak.length > 0 && <p className="mt-1 text-xs text-gray-500">Weak or generic here (rewrite before reusing): {e.weak.map((w: string) => `“${w}”`).join("; ")}</p>}</div>)}</Card>
+        {p.current && <Card><h3 className="mb-2 text-sm font-semibold">Your current profile</h3>{p.current.headline && <p className="text-sm">Headline ({p.current.headline.length}/220): has {p.current.headline.present.join(", ") || "none of the tracked keywords"}; missing {p.current.headline.missing.join(", ") || "nothing"}.</p>}{p.current.about && <p className="text-sm">About: has {p.current.about.present.join(", ") || "none of the tracked keywords"}; missing {p.current.about.missing.join(", ") || "nothing"}.</p>}</Card>}
+        <Card><ul className="list-disc space-y-1 pl-5 text-sm text-gray-700">{p.notes.map((n: string, i: number) => <li key={i}>{n}</li>)}</ul></Card>
+      </>}
+    </div>
+  );
+}
+
+function OutreachTab({ a, profile, update, provider, run, say }: any) {
+  const [names, setNames] = useState({ recruiter: a.recruiterName || "", manager: "" });
+  const [texts, setTexts] = useState<Record<string, string>>({});
+  const pack = a.outreach;
+  useEffect(() => setTexts(Object.fromEntries((pack?.messages ?? []).map((m: any) => [m.kind, m.text]))), [pack]);
+  const gen = () => run("Drafting messages…", async () => update({ ...a, outreach: await provider.generateRecruiterMessage(profile, a.jd, a.match, a.settings, { recruiterName: names.recruiter || undefined, hiringManagerName: names.manager || undefined }) }));
+  const idx = useMemo(() => buildIndex(profile), [profile]);
+  const bad = (t: string) => auditProse(t.replace(/\[[^\]]+\]/g, ""), { index: idx, allowedNames: [a.jd.company, a.jd.roleTitle] }).filter((c) => c.status === "UNSUPPORTED");
+  return (
+    <div className="space-y-4">
+      <Card className="space-y-3">
+        <p className="text-sm text-gray-700">Short messages built from your profile and the posting. The app does not know names, mutual contacts or anything about the company beyond the job text, and it does not make any up. Fill the bracketed placeholders yourself.</p>
+        <div className="grid gap-3 md:grid-cols-2"><div><Label htmlFor="o-r">Recruiter name (optional)</Label><Input id="o-r" value={names.recruiter} onChange={(e) => setNames({ ...names, recruiter: e.target.value })} /></div><div><Label htmlFor="o-m">Hiring manager name (optional)</Label><Input id="o-m" value={names.manager} onChange={(e) => setNames({ ...names, manager: e.target.value })} /></div></div>
+        <Button onClick={gen}>{pack ? "Redraft messages" : "Draft messages"}</Button>
+      </Card>
+      {pack?.messages.map((m: any) => { const t = texts[m.kind] ?? m.text; const flagged = bad(t); const over = m.limit && t.length > m.limit; return (
+        <Card key={m.kind} className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">{m.kind}</h3><span className={cx("font-mono text-xs", over ? "text-red-800" : "text-gray-500")}>{t.length}{m.limit ? `/${m.limit}` : ""}</span></div>
+          <Textarea id={`msg-${m.kind}`} rows={Math.max(3, Math.ceil(t.length / 90))} value={t} onChange={(e) => setTexts({ ...texts, [m.kind]: e.target.value })} />
+          {flagged.length > 0 && <div role="alert" className="rounded border border-red-300 bg-red-50 p-2 text-sm text-red-800"><b>POTENTIAL HALLUCINATION:</b> {flagged.map((f) => `“${f.text}” — ${f.reasons.join(" ")}`).join(" | ")}</div>}
+          <Button size="sm" variant="outline" disabled={flagged.length > 0 || !!over} onClick={() => copy(t, say)}>Copy</Button>
+        </Card>); })}
+      {pack && <Card><ul className="list-disc space-y-1 pl-5 text-sm text-gray-700">{pack.notes.map((n: string, i: number) => <li key={i}>{n}</li>)}</ul></Card>}
+    </div>
   );
 }
 

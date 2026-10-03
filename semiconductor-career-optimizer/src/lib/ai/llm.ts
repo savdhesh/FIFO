@@ -1,6 +1,5 @@
 import { z } from "zod";
 import type { AIProvider } from "./provider";
-import { NotImplementedError } from "./provider";
 import { MockProvider } from "./mock";
 import { PROMPTS } from "./prompts";
 import { ProfileSchema, ParsedJDSchema, type ClaimCheck, type ClaimStatus, type Profile } from "../types";
@@ -12,6 +11,8 @@ import { buildIndex } from "../profile-index";
 import { generateCoverLetter } from "../tailoring/cover-letter";
 import type { CoverLetter } from "../tailoring/cover-letter";
 import { countryStyle } from "../countries";
+import { planLinkedIn, type LinkedInPlan } from "../outreach/linkedin";
+import { planOutreach, type OutreachPack } from "../outreach/recruiter";
 
 export type Transport = (system: string, user: string) => Promise<string>;
 
@@ -121,6 +122,32 @@ export class LLMProvider implements AIProvider {
       return det.map((d) => { const m = out.checks.find((c) => c.text === d.text); return m && rank[m.status] > rank[d.status] ? { ...d, status: m.status, hallucination: m.status === "UNSUPPORTED", reasons: [...d.reasons, ...m.reasons.map((r) => `Model: ${r}`)] } : d; });
     } catch { return det; }
   }
-  async optimizeLinkedIn(): Promise<never> { throw new NotImplementedError("LinkedIn optimizer"); }
-  async generateRecruiterMessage(): Promise<never> { throw new NotImplementedError("Recruiter messages"); }
+  async optimizeLinkedIn(p: Profile, jd: Parameters<AIProvider["optimizeLinkedIn"]>[1], m: Parameters<AIProvider["optimizeLinkedIn"]>[2], s: Parameters<AIProvider["optimizeLinkedIn"]>[3], current?: { headline?: string; about?: string }): Promise<LinkedInPlan> {
+    const det = planLinkedIn(p, jd, m, s, current);
+    try {
+      const out = await structured(this.transport, z.object({ about: z.string().min(300).max(2600) }), PROMPTS.linkedin,
+        JSON.stringify({ profile: p, target: { role: jd.roleTitle, company: jd.company, keywords: m.strengths }, draft: det.about.text }));
+      const idx = buildIndex(p);
+      const lines = out.about.split("\n");
+      const removed: ClaimCheck[] = [];
+      const kept = lines.map((l) => { if (!l.trim()) return l; const r = sanitizeProse(l.replace(/^[•\-]\s*/, ""), { index: idx, allowedNames: [jd.company, jd.roleTitle] }, false); removed.push(...r.removed); return r.removed.length ? "" : l; });
+      if (removed.length) return det; // any unsupported sentence: keep the deterministic About instead of a partly-redacted one
+      return { ...det, about: { text: kept.join("\n").trim(), removed: [] } };
+    } catch { return det; }
+  }
+  async generateRecruiterMessage(p: Profile, jd: Parameters<AIProvider["generateRecruiterMessage"]>[1], m: Parameters<AIProvider["generateRecruiterMessage"]>[2], s: Parameters<AIProvider["generateRecruiterMessage"]>[3], opts?: { recruiterName?: string; hiringManagerName?: string }): Promise<OutreachPack> {
+    const det = planOutreach(p, jd, m, s, opts);
+    try {
+      const out = await structured(this.transport, z.object({ messages: z.array(z.object({ kind: z.string(), text: z.string().min(20).max(1500) })) }), PROMPTS.recruiterMessage,
+        JSON.stringify({ profile: p, role: jd.roleTitle, company: jd.company, kinds: det.messages.map((x) => x.kind), drafts: det.messages.map((x) => x.text) }));
+      const idx = buildIndex(p);
+      const BAD = /mutual|noticed your|saw your|i admire|congrat|your recent|i follow|we both|fellow alum/i;
+      return { ...det, messages: det.messages.map((d) => {
+        const c = out.messages.find((x) => x.kind === d.kind);
+        if (!c || BAD.test(c.text) || (d.limit && c.text.length > d.limit)) return d;
+        const r = sanitizeProse(c.text, { index: idx, allowedNames: [jd.company, jd.roleTitle] }, false);
+        return r.removed.length ? d : { ...d, text: c.text, length: c.text.length };
+      }) };
+    } catch { return det; }
+  }
 }

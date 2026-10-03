@@ -2,7 +2,10 @@
 
 Truth-protected resume tailoring, job-match analysis and cover-letter generation for semiconductor verification engineers (DV, SoC/IP, RISC-V/CPU, formal, functional safety).
 
-**Status: Phase 1 + Phase 2 complete** (auth, resume upload/parse, editable career profile, JD parsing, ontology-based match, requirement matrix, gap analysis, tailored resume with change control, cover letter, truth audit, DOCX/PDF export, application save). LinkedIn, recruiter messages, interview prep and analytics (Phases 3–4) are not built; their sidebar entries are disabled and the provider methods throw `NotImplementedError`.
+**Status: Phases 1–3 complete** (auth, resume upload/parse, editable career profile, JD parsing, ontology-based match, requirement matrix, gap analysis, tailored resume with change control, cover letter, truth audit, DOCX/PDF export, application save). Phase 3 adds the LinkedIn optimizer (keyword coverage ✓/△/✗, headline variants ≤220 chars, About, skill order, title-keyword check that never lets you claim an unheld title), recruiter messages (connection request ≤300 chars, post-application, reply to recruiter, hiring-manager; placeholders for names, no invented mutual contacts), and tracker status history/pipeline. Interview prediction and advanced analytics (Phase 4) are not built.
+
+## Run it inside Claude (no API keys)
+`npm run build:artifact` produces `dist/artifact.html`, a single page with the same engines bundled in. Published as a Claude Artifact it uses the artifact `sample` capability for the AI steps (resume parsing, rewrites, cover letter, LinkedIn About, message polish) on the viewer's own Claude usage, and falls back to the offline engine when Claude is unavailable. Data stays in the browser (local storage, with JSON backup/restore); files are saved through the `downloads` capability. Job URLs can't be fetched there (paste the text). The Next.js server app is the self-hosted alternative; its Phase 3 engines are exposed at `POST /api/applications/:id/outreach` (no UI tabs yet).
 
 ## How it works
 

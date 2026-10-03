@@ -7,12 +7,15 @@ import { auditProse, auditResume, checkClaim, summarizeChecks } from "../src/lib
 import { buildIndex } from "../src/lib/profile-index";
 import type { ChangeProposal, MatchResult, ParsedJD, Profile, Settings, TailoredResume } from "../src/lib/types";
 import type { CoverLetter } from "../src/lib/tailoring/cover-letter";
+import type { LinkedInPlan } from "../src/lib/outreach/linkedin";
+import type { OutreachPack } from "../src/lib/outreach/recruiter";
 
 export interface AppRecord {
   id: string; createdAt: string; company: string; roleTitle: string; jobUrl: string; jdText: string;
   settings: Settings; jd: ParsedJD; match: MatchResult;
   tailored: TailoredResume | null; changes: ChangeProposal[]; letter: CoverLetter | null;
   status: string; notes: string; recruiterName: string; recruiterContact: string; appliedAt: string;
+  linkedin?: LinkedInPlan | null; outreach?: OutreachPack | null; history?: { status: string; at: string }[];
 }
 
 export type Transport = (system: string, user: string) => Promise<string>;
@@ -28,7 +31,7 @@ export async function analyze(profile: Profile, p: AIProvider, input: { jdText: 
   const match = await p.compareResumeToJob(profile, jd, settings);
   return {
     id: globalThis.crypto?.randomUUID?.() ?? `a${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`, createdAt: new Date().toISOString(), company: jd.company, roleTitle: jd.roleTitle, jobUrl: input.jobUrl, jdText: input.jdText,
-    settings, jd, match, tailored: null, changes: [], letter: null, status: "ANALYZED", notes: "", recruiterName: "", recruiterContact: "", appliedAt: "",
+    settings, jd, match, tailored: null, changes: [], letter: null, status: "ANALYZED", history: [{ status: "ANALYZED", at: new Date().toISOString() }], notes: "", recruiterName: "", recruiterContact: "", appliedAt: "",
   };
 }
 
