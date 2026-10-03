@@ -5,17 +5,20 @@ import { ProfileSchema, SKILL_CATEGORIES, SettingsSchema, type Profile, type Rol
 import { COUNTRY_NAMES } from "../src/lib/countries";
 import { DEMO_JD_TEXT, DEMO_RESUME_TEXT } from "../src/lib/demo";
 import { parseResumeHeuristic } from "../src/lib/parsing/resume-parser";
-import { acceptAllSafe, analyze, decide, finalDocs, generate, providerFor, saveLetter, type AppRecord, type Transport } from "./logic";
+import { acceptAllSafe, analyze, decide, finalDocs, generate, parseResume, providerFor, saveLetter, type AppRecord, type Transport } from "./logic";
 import { coverDocxBlob, coverLetterPdf, fitResume, reportPdf, resumeDocxBlob, resumePdf } from "./exporters";
 import { extractBrowser, extractPdfBytes, extractWithLayout } from "./extract";
 import { packName } from "../src/lib/export/names";
 import { auditProse } from "../src/lib/truth/truth";
+import type { ParseDiagnostics } from "../src/lib/parsing/diagnostics";
 import { acceptSafeItems, applyMerge, mergeResumes, type MergeItem, type MergeReport } from "../src/lib/merge/merge";
 import { buildDeck, deckBuffer } from "../src/lib/deck/deck";
 import { computeAnalytics } from "../src/lib/analytics/analytics";
 import { atsParse, type AtsReport } from "../src/lib/ats/ats";
 import { auditCredibility } from "../src/lib/credibility/credibility";
 import { planStrategy } from "../src/lib/strategy/strategy";
+import { show } from "../src/lib/outreach/shared";
+import { weakTopics, type CoachResult } from "../src/lib/coach/coach";
 import { THEMES, themeById } from "../src/lib/export/themes";
 import { ontology, type VocabEntry } from "../src/lib/ontology/ontology";
 import { DEFAULT_WEIGHTS } from "../src/lib/matching/matcher";
@@ -23,7 +26,7 @@ import { buildIndex } from "../src/lib/profile-index";
 
 declare const claude: any;
 const KEY = "sco.v1";
-type Resume = { id: string; name: string; addedAt: string; profile: Profile; ats?: AtsReport | null };
+type Resume = { id: string; name: string; addedAt: string; profile: Profile; ats?: AtsReport | null; diag?: ParseDiagnostics | null; source?: string };
 type Prefs = { weights?: Record<string, number>; theme: string; vocab: VocabEntry[] };
 type Store = { profile: Profile | null; apps: AppRecord[]; resumes: Resume[]; prefs: Prefs };
 const DEFAULT_PREFS: Prefs = { theme: "plain", vocab: [] };
@@ -96,11 +99,13 @@ function ProfileView({ profile, setProfile, resumes, setResumes, provider, run, 
   const file = useRef<HTMLInputElement>(null);
   const [paste, setPaste] = useState("");
   const [report, setReport] = useState<MergeReport | null>(null);
+  const [review, setReview] = useState<{ name: string; diag: ParseDiagnostics; source: string } | null>(null);
   const [items, setItems] = useState<MergeItem[]>([]);
   const addResume = async (name: string, text: string, existing: Resume[], layout?: any) => {
     if (text.trim().length < 200) throw new Error(`${name}: almost no text found. This looks like a scanned/image file, which an ATS cannot read either. Use a text-based PDF, DOCX or TXT, or paste the text.`);
-    const parsed: Profile = await provider.analyzeResume(text);
-    return [...existing, { id: `res${Date.now().toString(36)}${existing.length}`, name, addedAt: new Date().toISOString(), profile: parsed, ats: atsParse(text, layout) }];
+    const parsed = await parseResume(provider, text);
+    setReview({ name, diag: parsed.diag, source: parsed.source });
+    return [...existing, { id: `res${Date.now().toString(36)}${existing.length}`, name, addedAt: new Date().toISOString(), profile: parsed.profile, ats: atsParse(text, layout), diag: { ...parsed.diag, unplaced: parsed.diag.unplaced }, source: parsed.source }];
   };
   const afterAdd = (all: Resume[]) => {
     setResumes(() => all);
@@ -131,6 +136,7 @@ function ProfileView({ profile, setProfile, resumes, setResumes, provider, run, 
         {resumes.length > 0 && <ul className="divide-y divide-line rounded-md border border-line text-sm">{resumes.map((r: Resume) => <li key={r.id} className="flex items-center justify-between gap-2 p-2"><span><b>{r.name}</b> <span className="text-gray-500">· {r.profile.roles.length} roles, {r.profile.roles.reduce((a, x) => a + x.responsibilities.length + x.achievements.length, 0)} bullets · {r.profile.roles[0]?.title ?? "no roles found"}</span> {r.ats && <span title={r.ats.checks.filter((c) => c.status !== "pass").map((c) => `${c.label}: ${c.detail}`).join("\n") || "No ATS issues found"}><Badge tone={r.ats.risk === "Low" ? "green" : r.ats.risk === "Medium" ? "amber" : "red"}>ATS {r.ats.risk}</Badge></span>}</span><button className="text-xs text-red-800 underline" onClick={() => setResumes((xs: Resume[]) => xs.filter((x) => x.id !== r.id))}>Remove</button></li>)}</ul>}
       </Card>
 
+      {review && <ParseReview review={review} profile={profile} setProfile={setProfile} close={() => setReview(null)} />}
       {report && (
         <Card className="space-y-4" id="merge-review">
           <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">Merge review <span className="font-normal text-gray-500">· base: {report.analysis.baseName}</span></h2>
@@ -153,6 +159,31 @@ function ProfileView({ profile, setProfile, resumes, setResumes, provider, run, 
       )}
       {profile ? <ProfileEditor profile={profile} setProfile={setProfile} say={say} goAnalyze={goAnalyze} /> : <Card className="text-sm text-gray-600">No profile yet. Upload resumes or load the demo profile to begin.</Card>}
     </div>
+  );
+}
+
+
+function ParseReview({ review, profile, setProfile, close }: { review: { name: string; diag: ParseDiagnostics; source: string }; profile: Profile | null; setProfile: (p: Profile) => void; close: () => void }) {
+  const [left, setLeft] = useState<string[]>(review.diag.unplaced);
+  const [target, setTarget] = useState<Record<string, string>>({});
+  useEffect(() => setLeft(review.diag.unplaced), [review]);
+  const d = review.diag;
+  const place = (line: string) => {
+    const t = target[line] ?? "dismiss";
+    if (profile && t.startsWith("role:")) { const id = t.slice(5); setProfile({ ...profile, roles: profile.roles.map((r) => (r.id === id ? { ...r, responsibilities: [...r.responsibilities, line.replace(/^[•\-–*]\s*/, "")] } : r)) }); }
+    else if (profile && t === "achievement") setProfile({ ...profile, achievements: [...profile.achievements, line] });
+    else if (profile && t === "summary") setProfile({ ...profile, summary: [profile.summary, line].filter(Boolean).join(" ") });
+    setLeft((xs) => xs.filter((x) => x !== line));
+  };
+  return (
+    <Card className="space-y-3" id="parse-review">
+      <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">Parse review · {review.name}</h2><div className="flex items-center gap-2"><Badge tone={d.confidence === "High" ? "green" : d.confidence === "Medium" ? "amber" : "red"}>{d.confidence} confidence</Badge><span className="font-mono text-xs text-gray-500">{Math.round(d.coverage * 100)}% of text placed</span><Button size="sm" variant="ghost" onClick={close}>Close</Button></div></div>
+      <p className="text-xs text-gray-500">Parsed with the {review.source}. {d.confidence === "High" && !left.length ? "Nothing needs attention, but still skim the profile below." : "Check the items below, then correct the profile."}</p>
+      {d.flags.length > 0 && <ul className="list-disc space-y-1 pl-5 text-sm">{d.flags.map((f, i) => <li key={i} className={f.level === "error" ? "text-red-800" : "text-amber-800"}>{f.message}</li>)}</ul>}
+      {left.length > 0 && <div><Label>Lines the parser could not place</Label><div className="space-y-2">{left.map((l) => <div key={l} className="grid items-center gap-2 rounded-md border border-line p-2 md:grid-cols-[1fr_14rem_auto]"><span className="text-sm">{l}</span>
+        <Select aria-label={`Where to put: ${l.slice(0, 30)}`} value={target[l] ?? "dismiss"} onChange={(e) => setTarget({ ...target, [l]: e.target.value })}><option value="dismiss">Ignore</option>{profile?.roles.map((r) => <option key={r.id} value={`role:${r.id}`}>Bullet in {r.title || "role"} @ {r.employer || "?"}</option>)}<option value="achievement">Key achievement</option><option value="summary">Append to summary</option></Select>
+        <Button size="sm" variant="outline" onClick={() => place(l)}>Apply</Button></div>)}</div></div>}
+    </Card>
   );
 }
 
@@ -608,7 +639,7 @@ const probTone = (p: string) => (p === "High" ? "red" : p === "Medium" ? "amber"
 const levelTone = (l: number) => (l >= 4 ? "red" : l === 3 ? "amber" : l === 2 ? "blue" : "green");
 
 function InterviewTab({ a, profile, update, provider, run }: any) {
-  const [src, setSrc] = useState<"bank" | "resume" | "gap" | "live">("bank");
+  const [src, setSrc] = useState<"bank" | "resume" | "gap" | "live" | "practice">("bank");
   const [lvl, setLvl] = useState(0);
   const plan = a.interview;
   const done: Record<string, boolean> = a.prepDone ?? {};
@@ -626,9 +657,9 @@ function InterviewTab({ a, profile, update, provider, run }: any) {
         <Card><h3 className="mb-2 text-sm font-semibold">Topic likelihood <span className="font-normal text-gray-500">· weighted to {plan.targetLevelName} level</span></h3>
           <div className="grid gap-x-8 gap-y-1 md:grid-cols-2">{plan.topics.map((t: any) => <div key={t.topic} className="text-sm" title={t.reasons.join("; ")}><div className="flex items-center justify-between gap-2"><span>{t.display} {t.stance !== "strength" && <Badge tone={t.stance === "gap" ? "red" : "amber"}>{t.stance}</Badge>}</span><Badge tone={probTone(t.probability)}>{t.probability}</Badge></div><div className="mt-0.5 h-1 rounded bg-gray-100"><div className="h-1 rounded bg-ink" style={{ width: `${Math.min(100, t.score * 10)}%` }} /></div></div>)}</div>
           <ul className="mt-3 list-disc pl-5 text-xs text-gray-500">{plan.notes.map((n: string, i: number) => <li key={i}>{n}</li>)}</ul></Card>
-        <div className="flex flex-wrap items-center gap-2" role="tablist">{([["bank", `Top ${plan.questions.length}`], ["resume", `From your resume (${plan.resumeDrills.length})`], ["gap", `Your gaps (${plan.gapQuestions.length})`], ["live", "Live exercises"]] as const).map(([k, l]) => <button key={k} role="tab" aria-selected={src === k} onClick={() => setSrc(k)} className={cx("rounded-md border border-line px-3 py-1 text-sm", src === k && "bg-ink text-white")}>{l}</button>)}
-          {src !== "live" && <span className="ml-3 flex gap-1" role="group" aria-label="Level">{[[0, "All"], [1, "Basic"], [2, "Intermediate"], [3, "Staff"], [4, "Principal"]].map(([v, l]) => <button key={v as number} onClick={() => setLvl(v as number)} className={cx("rounded-md border border-line px-2 py-1 text-xs", lvl === v && "bg-ink text-white")}>{l}</button>)}</span>}</div>
-        {src === "live" ? <Card><h3 className="mb-2 text-sm font-semibold">Likely live exercises</h3>{plan.liveExercises.length ? <ul className="list-disc space-y-1 pl-5 text-sm">{plan.liveExercises.map((x: string, i: number) => <li key={i}>{x}</li>)}</ul> : <p className="text-sm text-gray-500">Nothing in this job points at a specific live exercise.</p>}</Card>
+        <div className="flex flex-wrap items-center gap-2" role="tablist">{([["bank", `Top ${plan.questions.length}`], ["resume", `From your resume (${plan.resumeDrills.length})`], ["gap", `Your gaps (${plan.gapQuestions.length})`], ["live", "Live exercises"], ["practice", "Practice with feedback"]] as const).map(([k, l]) => <button key={k} role="tab" aria-selected={src === k} onClick={() => setSrc(k)} className={cx("rounded-md border border-line px-3 py-1 text-sm", src === k && "bg-ink text-white")}>{l}</button>)}
+          {src !== "live" && src !== "practice" && <span className="ml-3 flex gap-1" role="group" aria-label="Level">{[[0, "All"], [1, "Basic"], [2, "Intermediate"], [3, "Staff"], [4, "Principal"]].map(([v, l]) => <button key={v as number} onClick={() => setLvl(v as number)} className={cx("rounded-md border border-line px-2 py-1 text-xs", lvl === v && "bg-ink text-white")}>{l}</button>)}</span>}</div>
+        {src === "practice" ? <PracticePanel a={a} plan={plan} profile={profile} update={update} provider={provider} run={run} /> : src === "live" ? <Card><h3 className="mb-2 text-sm font-semibold">Likely live exercises</h3>{plan.liveExercises.length ? <ul className="list-disc space-y-1 pl-5 text-sm">{plan.liveExercises.map((x: string, i: number) => <li key={i}>{x}</li>)}</ul> : <p className="text-sm text-gray-500">Nothing in this job points at a specific live exercise.</p>}</Card>
           : <div className="space-y-3">{list.map((q: any) => (
             <Card key={q.id} className={cx(done[q.id] && "opacity-70")}>
               <div className="mb-1 flex flex-wrap items-center gap-2"><Badge tone={levelTone(q.level)}>{q.levelName}</Badge>{q.stance !== "strength" && <Badge tone={q.stance === "gap" ? "red" : "amber"}>{q.stance === "gap" ? "gap: be honest" : "related only"}</Badge>}<span className="text-xs text-gray-500">{q.source === "resume" ? "from your resume" : q.topic}</span>
@@ -644,6 +675,54 @@ function InterviewTab({ a, profile, update, provider, run }: any) {
               </details>
             </Card>))}{!list.length && <Card className="text-sm text-gray-500">No questions at this level.</Card>}</div>}
       </>}
+    </div>
+  );
+}
+
+
+function PracticePanel({ a, plan, profile, update, provider, run }: any) {
+  const all: any[] = useMemo(() => [...plan.questions, ...plan.gapQuestions, ...plan.resumeDrills], [plan]);
+  const practice: Record<string, { at: string; score: number; words: number }[]> = a.practice ?? {};
+  const [sel, setSel] = useState<string>(() => (all.find((q) => !practice[q.id]) ?? all[0])?.id);
+  const [answer, setAnswer] = useState("");
+  const [res, setRes] = useState<CoachResult | null>(null);
+  const q = all.find((x) => x.id === sel);
+  useEffect(() => { setAnswer(""); setRes(null); }, [sel]);
+  const weak = useMemo(() => weakTopics(practice, all), [a.practice, all]);
+  if (!q) return null;
+  const hist = practice[q.id] ?? [];
+  const submit = () => run(provider.name === "claude" ? "Claude is reviewing your answer…" : "Reviewing your answer…", async () => {
+    const r: CoachResult = await provider.coachAnswer(profile, a.jd, q, answer);
+    setRes(r);
+    update({ ...a, practice: { ...practice, [q.id]: [...hist, { at: new Date().toISOString(), score: r.score, words: r.words }] }, prepDone: r.score >= 70 ? { ...(a.prepDone ?? {}), [q.id]: true } : a.prepDone });
+  });
+  const tone = (s: number) => (s >= 80 ? "green" : s >= 65 ? "blue" : s >= 45 ? "amber" : "red");
+  return (
+    <div className="grid gap-4 lg:grid-cols-3">
+      <Card className="space-y-2 lg:col-span-1"><h3 className="text-sm font-semibold">Pick a question</h3>
+        <div className="max-h-[28rem] space-y-1 overflow-auto" role="listbox" aria-label="Questions">{all.map((x) => { const h = practice[x.id]; return <button key={x.id} role="option" aria-selected={x.id === sel} onClick={() => setSel(x.id)} className={cx("block w-full rounded-md border border-line p-2 text-left text-sm", x.id === sel && "border-ink")}><span className="line-clamp-2">{x.q}</span><span className="mt-1 flex gap-1"><Badge tone={levelTone(x.level)}>{x.levelName}</Badge>{h ? <Badge tone={tone(h[h.length - 1].score)}>last {h[h.length - 1].score}</Badge> : <Badge>new</Badge>}</span></button>; })}</div>
+        {weak.length > 0 && <div><Label>Weakest topics so far</Label>{weak.slice(0, 4).map((w) => <div key={w.topic} className="flex justify-between text-sm"><span>{show(w.topic)}</span><span className="font-mono text-xs text-gray-500">{w.avg} · {w.attempts}×</span></div>)}</div>}
+      </Card>
+      <div className="space-y-3 lg:col-span-2">
+        <Card className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2"><Badge tone={levelTone(q.level)}>{q.levelName}</Badge>{q.stance !== "strength" && <Badge tone={q.stance === "gap" ? "red" : "amber"}>{q.stance === "gap" ? "gap: be honest" : "related only"}</Badge>}</div>
+          <p className="text-sm font-medium">{q.q}</p>
+          {q.honestyNote && <p className="rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-800">{q.honestyNote}</p>}
+          {q.evidence.length > 0 && <details><summary className="cursor-pointer text-sm underline">Your own example to draw on</summary>{q.evidence.map((e: any, i: number) => <p key={i} className="mt-1 text-sm"><span className="text-xs text-gray-500">{e.label}: </span>{e.text}</p>)}</details>}
+          <Textarea id="practice-answer" aria-label="Your answer" rows={9} value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="Type your answer as you would say it. Aim for 90 to 250 words." />
+          <div className="flex items-center gap-3"><Button disabled={answer.trim().length < 5} onClick={submit}>Get feedback</Button><span className="font-mono text-xs text-gray-500">{answer.trim() ? answer.trim().split(/\s+/).length : 0} words</span>{hist.length > 0 && <span className="text-xs text-gray-500">Attempts: {hist.map((h) => h.score).join(" → ")}</span>}</div>
+        </Card>
+        {res && <Card className="space-y-3">
+          <div className="flex items-center gap-3"><div className="font-mono text-3xl font-semibold">{res.score}</div><Badge tone={tone(res.score)}>{res.band}</Badge></div>
+          <div className="space-y-1">{res.dims.map((d) => <div key={d.key} className="grid grid-cols-[14rem_1fr_auto] items-center gap-2 text-sm"><span>{d.label}</span><div className="h-2 rounded bg-gray-100"><div className="h-2 rounded bg-accent" style={{ width: `${Math.round(d.score * 100)}%` }} /></div><span className="text-xs text-gray-500">{d.note}</span></div>)}</div>
+          {res.flags.filter((f) => f.severity === "claim").length > 0 && <div role="alert" className="rounded border border-red-300 bg-red-50 p-2 text-sm text-red-800"><b>POTENTIAL HALLUCINATION in your answer:</b> {res.flags.filter((f) => f.severity === "claim").map((f) => `“${f.text}” — ${f.reasons.join(" ")}`).join(" | ")}</div>}
+          {res.strengths.length > 0 && <div><Label>What worked</Label><ul className="list-disc pl-5 text-sm">{res.strengths.map((x, i) => <li key={i}>{x}</li>)}</ul></div>}
+          {res.improvements.length > 0 && <div><Label>To improve</Label><ul className="list-disc pl-5 text-sm">{res.improvements.map((x, i) => <li key={i}>{x}</li>)}</ul></div>}
+          {res.missed.length > 0 && <div><Label>Points not yet covered</Label><ul className="list-disc pl-5 text-sm text-gray-700">{res.missed.map((x, i) => <li key={i}>{x}</li>)}</ul></div>}
+          {res.llm && <div className="rounded bg-gray-50 p-3 text-sm"><Label>Claude's feedback</Label>{res.llm.summary && <p>{res.llm.summary}</p>}{res.llm.improvements.length > 0 && <ul className="mt-1 list-disc pl-5">{res.llm.improvements.map((x, i) => <li key={i}>{x}</li>)}</ul>}</div>}
+          {res.score >= 70 && <p className="text-sm text-green-800">Marked as prepared.</p>}
+        </Card>}
+      </div>
     </div>
   );
 }

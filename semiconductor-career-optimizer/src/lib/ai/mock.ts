@@ -9,6 +9,7 @@ import { buildIndex } from "../profile-index";
 import { planLinkedIn } from "../outreach/linkedin";
 import { planOutreach } from "../outreach/recruiter";
 import { planInterview } from "../interview/interview";
+import { coachAnswer } from "../coach/coach";
 
 /** Offline provider: fully deterministic, no network, no data leaves the server. */
 export class MockProvider implements AIProvider {
@@ -21,6 +22,7 @@ export class MockProvider implements AIProvider {
   async generateCoverLetter(p: Parameters<AIProvider["generateCoverLetter"]>[0], jd: Parameters<AIProvider["generateCoverLetter"]>[1], m: Parameters<AIProvider["generateCoverLetter"]>[2], s: Parameters<AIProvider["generateCoverLetter"]>[3]) { return generateCoverLetter(p, jd, m, s); }
   async auditClaims(p: Parameters<AIProvider["auditClaims"]>[0], claims: string[]) { const index = buildIndex(p); return claims.map((c) => checkClaim(c, { index })); }
   async generateInterviewPrep(p: Parameters<AIProvider["generateInterviewPrep"]>[0], jd: Parameters<AIProvider["generateInterviewPrep"]>[1], m: Parameters<AIProvider["generateInterviewPrep"]>[2], s: Parameters<AIProvider["generateInterviewPrep"]>[3]) { return planInterview(p, jd, m, s); }
+  async coachAnswer(p: Parameters<AIProvider["coachAnswer"]>[0], jd: Parameters<AIProvider["coachAnswer"]>[1], q: Parameters<AIProvider["coachAnswer"]>[2], a: string) { return coachAnswer(q, a, p, [jd.company, jd.roleTitle].filter(Boolean)); }
   async optimizeLinkedIn(...a: Parameters<AIProvider["optimizeLinkedIn"]>) { return planLinkedIn(...a); }
   async generateRecruiterMessage(...a: Parameters<AIProvider["generateRecruiterMessage"]>) { return planOutreach(...a); }
 }

@@ -7,6 +7,8 @@ import { auditProse, auditResume, checkClaim, summarizeChecks } from "../src/lib
 import { buildIndex } from "../src/lib/profile-index";
 import type { ChangeProposal, MatchResult, ParsedJD, Profile, Settings, TailoredResume } from "../src/lib/types";
 import type { CoverLetter } from "../src/lib/tailoring/cover-letter";
+import { parseResumeHeuristic } from "../src/lib/parsing/resume-parser";
+import { diagnoseParse, type ParseDiagnostics } from "../src/lib/parsing/diagnostics";
 import type { LinkedInPlan } from "../src/lib/outreach/linkedin";
 import type { OutreachPack } from "../src/lib/outreach/recruiter";
 import type { InterviewPlan } from "../src/lib/interview/interview";
@@ -17,7 +19,7 @@ export interface AppRecord {
   tailored: TailoredResume | null; changes: ChangeProposal[]; letter: CoverLetter | null;
   status: string; notes: string; recruiterName: string; recruiterContact: string; appliedAt: string;
   packVersion?: number; packAt?: string; theme?: string;
-  linkedin?: LinkedInPlan | null; outreach?: OutreachPack | null; interview?: InterviewPlan | null; prepDone?: Record<string, boolean>; history?: { status: string; at: string }[];
+  linkedin?: LinkedInPlan | null; outreach?: OutreachPack | null; interview?: InterviewPlan | null; prepDone?: Record<string, boolean>; practice?: Record<string, { at: string; score: number; words: number }[]>; history?: { status: string; at: string }[];
 }
 
 export type Transport = (system: string, user: string) => Promise<string>;
@@ -82,4 +84,19 @@ export function saveLetter(a: AppRecord, profile: Profile, paragraphs: string[])
   const bad = checks.filter((c) => c.status === "UNSUPPORTED");
   if (bad.length) throw new Error("POTENTIAL HALLUCINATION: " + bad.map((b) => `“${b.text}” — ${b.reasons.join(" ")}`).join(" | "));
   return { ...a, letter: { ...a.letter, paragraphs, checks, removed: [], wordCount: paragraphs.join(" ").split(/\s+/).length } };
+}
+
+/**
+ * Parse a resume. With Claude on, both parsers run and the better-grounded result wins; the choice and its quality are reported.
+ * Claude output is already filtered to text that exists in the source (see groundProfile), so it cannot add claims.
+ */
+export async function parseResume(p: AIProvider, text: string): Promise<{ profile: Profile; diag: ParseDiagnostics; source: string }> {
+  const heur = parseResumeHeuristic(text);
+  const dh = diagnoseParse(text, heur);
+  if (p.name === "mock") return { profile: heur, diag: dh, source: "built-in parser" };
+  const llm = await p.analyzeResume(text);
+  const dl = diagnoseParse(text, llm);
+  const dated = (x: Profile) => x.roles.filter((r) => r.startDate).length;
+  const better = dl.coverage >= dh.coverage - 0.02 && llm.roles.length >= heur.roles.length && dated(llm) >= dated(heur);
+  return better ? { profile: llm, diag: dl, source: "Claude (checked against the source text)" } : { profile: heur, diag: dh, source: "built-in parser (Claude's result covered less of the text)" };
 }

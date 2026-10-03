@@ -1,0 +1,11 @@
+Jamie Fictional
+jamie.f@example.com | +1 555 010 9999 | Santa Clara, CA
+
+SKILLS                          EXPERIENCE
+SystemVerilog                   Principal Engineer, Initech Silicon     2019 – Present
+UVM                             • Led UVM environment for a PCIe Gen5 root complex.
+Python                          • Closed coverage across 3 IP blocks.
+PCIe, AXI                       Staff Engineer, Hooli Chips             2014 – 2019
+                                • Built scoreboards and reference models for AXI fabrics.
+EDUCATION
+MS Computer Engineering, Example State University, 2014

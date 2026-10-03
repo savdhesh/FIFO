@@ -1,7 +1,7 @@
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 const MONTH_RE = "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
 const DATE_TOKEN = `(?:${MONTH_RE}\\.?\\s*,?\\s*(?:19|20)\\d{2}|\\d{1,2}[/.](?:19|20)\\d{2}|(?:19|20)\\d{2})`;
-const PRESENT = "(?:present|current|now|till date|to date|ongoing)";
+const PRESENT = "(?:present|current|currently|now|till date|to date|ongoing|heute|bis heute|aktuell|aujourd.hui|actuel|actuellement|heden|nu|nuvarande|pågående|presente|actualidad|hoy)";
 export const DATE_RANGE_RE = new RegExp(`(${DATE_TOKEN})\\s*(?:-|–|—|to|until)\\s*(${DATE_TOKEN}|${PRESENT})`, "i");
 
 export interface YM { y: number; m: number }

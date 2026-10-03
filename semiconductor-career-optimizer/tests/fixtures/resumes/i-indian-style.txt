@@ -1,0 +1,31 @@
+RESUME
+Name: Karan Fictional
+Mobile: +91-9800000000   Email: karan.f@example.com
+Address: Hyderabad, Telangana, India
+
+CAREER OBJECTIVE
+To contribute to a challenging role in design verification.
+
+PROFESSIONAL EXPERIENCE
+Company: Example Semiconductors Pvt Ltd, Hyderabad
+Designation: Senior Verification Engineer
+Duration: March 2017 to Present
+Responsibilities:
+• Developed UVM testbenches for AXI and APB IP.
+• Debugged regression failures with Verdi.
+
+Company: Sample Chips India Pvt Ltd, Bengaluru
+Designation: Verification Engineer
+Duration: July 2013 to February 2017
+Responsibilities:
+• Wrote directed and constrained random tests in SystemVerilog.
+
+EDUCATIONAL QUALIFICATION
+B.Tech in ECE, Example University, 2013
+
+PERSONAL DETAILS
+Date of Birth: 01 Jan 1990
+Languages Known: English, Hindi
+
+DECLARATION
+I hereby declare that the above information is true.

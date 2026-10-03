@@ -1,0 +1,12 @@
+Taylor Fictional
+taylor.f@example.com | Austin, TX | github.com/taylorf-demo
+
+EXPERIENCE
+Staff Verification Engineer at Globex Silicon, Austin, TX (Mar 2020 – Present)
+- Defined the formal sign-off flow for cache coherency checkers with JasperGold.
+- Led a team of 3 engineers on CHI verification.
+Verification Engineer at Initech, Portland, OR (Jun 2015 – Feb 2020)
+- Built UVM agents for DDR4 controllers.
+
+EDUCATION
+BS Electrical Engineering, Example University, 2015

@@ -13,7 +13,8 @@ import type { CoverLetter } from "../tailoring/cover-letter";
 import { countryStyle } from "../countries";
 import { planLinkedIn, type LinkedInPlan } from "../outreach/linkedin";
 import { planOutreach, type OutreachPack } from "../outreach/recruiter";
-import { planInterview, type InterviewPlan } from "../interview/interview";
+import { planInterview, type InterviewPlan, type PlannedQ } from "../interview/interview";
+import { coachAnswer, type CoachResult } from "../coach/coach";
 
 export type Transport = (system: string, user: string) => Promise<string>;
 
@@ -137,6 +138,19 @@ export class LLMProvider implements AIProvider {
         return sanitizeProse(o.outline, { index: idx, allowedNames: [jd.company, jd.roleTitle] }, false).removed.length ? q : { ...q, outline: o.outline };
       };
       return { ...det, questions: det.questions.map(apply), gapQuestions: det.gapQuestions.map(apply), resumeDrills: det.resumeDrills.map(apply) };
+    } catch { return det; }
+  }
+  async coachAnswer(p: Profile, jd: Parameters<AIProvider["coachAnswer"]>[1], q: PlannedQ, answer: string): Promise<CoachResult> {
+    const allowed = [jd.company, jd.roleTitle].filter(Boolean);
+    const det = coachAnswer(q, answer, p, allowed);
+    if (answer.trim().split(/\s+/).length < 15) return det; // nothing for a model to critique
+    try {
+      const out = await structured(this.transport, z.object({ summary: z.string().max(600), strengths: z.array(z.string().max(300)).max(5), improvements: z.array(z.string().max(300)).max(6) }), PROMPTS.coach,
+        JSON.stringify({ question: q.q, level: q.levelName, keyPoints: q.points, stance: q.stance, honestyNote: q.honestyNote, candidateEvidence: q.evidence.map((e) => e.text), answer }));
+      const idx = buildIndex(p);
+      // Feedback may suggest wording; any line that asserts something the profile does not support is dropped.
+      const safe = (xs: string[]) => xs.filter((x) => !sanitizeProse(x, { index: idx, allowedNames: allowed }, false).removed.length);
+      return { ...det, llm: { summary: safe([out.summary])[0] ?? "", strengths: safe(out.strengths), improvements: safe(out.improvements) } };
     } catch { return det; }
   }
   async optimizeLinkedIn(p: Profile, jd: Parameters<AIProvider["optimizeLinkedIn"]>[1], m: Parameters<AIProvider["optimizeLinkedIn"]>[2], s: Parameters<AIProvider["optimizeLinkedIn"]>[3], current?: { headline?: string; about?: string }): Promise<LinkedInPlan> {

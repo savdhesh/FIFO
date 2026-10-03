@@ -1,0 +1,17 @@
+LEBENSLAUF / CV
+Marta Fictional
+Anna-Lena-Weg 5, 80331 Munich, Germany
+marta.f@example.com  +49 151 0000000
+
+BERUFSERFAHRUNG / EXPERIENCE
+03/2019 – heute      Senior Verification Engineer, Bavaria Chips GmbH, Munich
+                     • Verified an ISO 26262 ASIL-D MCU subsystem with UVM and Xcelium.
+                     • Built fault injection tests for lockstep and ECC safety mechanisms.
+08/2014 – 02/2019    Verification Engineer, Rhein Semiconductors AG, Dresden
+                     • Developed SystemVerilog testbenches for SPI and CAN controllers.
+
+AUSBILDUNG / EDUCATION
+2012 – 2014          M.Sc. Electrical Engineering, Example Technical University Munich
+
+KENNTNISSE / SKILLS
+SystemVerilog, UVM, Python; CAN, SPI, AXI; Xcelium, Verdi
