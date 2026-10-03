@@ -9,7 +9,7 @@ const contact = (id: TailoredResume["identity"]) => [id.location, id.email, id.p
 const numbering = { config: [{ reference: "bullets", levels: [{ level: 0, format: LevelFormat.BULLET, text: "•", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 360, hanging: 240 } } } }] }] };
 
 /** Plain paragraphs only (no tables, text boxes, headers/footers) so ATS parsers read it in order. */
-export function resumeDocx(r: TailoredResume): Promise<Buffer> {
+export function resumeDoc(r: TailoredResume): Document {
   const out: Paragraph[] = [];
   const heading = (t: string) => out.push(new Paragraph({ spacing: { before: 200, after: 80 }, border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "999999", space: 1 } }, children: [run(t.toUpperCase(), { bold: true, size: 22 })] }));
   const para = (t: string) => out.push(new Paragraph({ spacing: { after: 60 }, children: [run(t)] }));
@@ -31,11 +31,11 @@ export function resumeDocx(r: TailoredResume): Promise<Buffer> {
   if (r.education.length) { heading("Education"); r.education.forEach(para); }
   if (r.certifications.length) { heading("Certifications"); r.certifications.forEach(bullet); }
   if (r.publications.length) { heading("Publications"); r.publications.forEach(bullet); }
-  const doc = new Document({ creator: r.identity.name, title: `${r.identity.name} Resume`, numbering, sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 850, bottom: 850, left: 1000, right: 1000 } } }, children: out }] });
-  return Packer.toBuffer(doc);
+  return new Document({ creator: r.identity.name, title: `${r.identity.name} Resume`, numbering, sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 850, bottom: 850, left: 1000, right: 1000 } } }, children: out }] });
 }
+export const resumeDocx = (r: TailoredResume): Promise<Buffer> => Packer.toBuffer(resumeDoc(r));
 
-export function coverLetterDocx(l: CoverLetter, identity: TailoredResume["identity"]): Promise<Buffer> {
+export function coverLetterDoc(l: CoverLetter, identity: TailoredResume["identity"]): Document {
   const out: Paragraph[] = [
     new Paragraph({ children: [run(identity.name, { bold: true, size: 28 })] }),
     new Paragraph({ spacing: { after: 240 }, children: [run(contact(identity), { size: 19, color: "444444" })] }),
@@ -45,5 +45,6 @@ export function coverLetterDocx(l: CoverLetter, identity: TailoredResume["identi
     new Paragraph({ spacing: { before: 120, after: 240 }, children: [run(l.closing)] }),
     new Paragraph({ children: [run(l.signature, { bold: true })] }),
   ];
-  return Packer.toBuffer(new Document({ creator: identity.name, title: `${identity.name} Cover Letter`, sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1000, bottom: 1000, left: 1200, right: 1200 } } }, children: out }] }));
+  return new Document({ creator: identity.name, title: `${identity.name} Cover Letter`, sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1000, bottom: 1000, left: 1200, right: 1200 } } }, children: out }] });
 }
+export const coverLetterDocx = (l: CoverLetter, identity: TailoredResume["identity"]): Promise<Buffer> => Packer.toBuffer(coverLetterDoc(l, identity));
