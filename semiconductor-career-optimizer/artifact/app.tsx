@@ -6,20 +6,28 @@ import { COUNTRY_NAMES } from "../src/lib/countries";
 import { DEMO_JD_TEXT, DEMO_RESUME_TEXT } from "../src/lib/demo";
 import { parseResumeHeuristic } from "../src/lib/parsing/resume-parser";
 import { acceptAllSafe, analyze, decide, finalDocs, generate, providerFor, saveLetter, type AppRecord, type Transport } from "./logic";
-import { coverDocxBlob, coverLetterPdf, reportPdf, resumeDocxBlob, resumePdf } from "./exporters";
-import { extractBrowser } from "./extract";
+import { coverDocxBlob, coverLetterPdf, fitResume, reportPdf, resumeDocxBlob, resumePdf } from "./exporters";
+import { extractBrowser, extractPdfBytes, extractWithLayout } from "./extract";
 import { packName } from "../src/lib/export/names";
 import { auditProse } from "../src/lib/truth/truth";
 import { acceptSafeItems, applyMerge, mergeResumes, type MergeItem, type MergeReport } from "../src/lib/merge/merge";
 import { buildDeck, deckBuffer } from "../src/lib/deck/deck";
 import { computeAnalytics } from "../src/lib/analytics/analytics";
+import { atsParse, type AtsReport } from "../src/lib/ats/ats";
+import { auditCredibility } from "../src/lib/credibility/credibility";
+import { planStrategy } from "../src/lib/strategy/strategy";
+import { THEMES, themeById } from "../src/lib/export/themes";
+import { ontology, type VocabEntry } from "../src/lib/ontology/ontology";
+import { DEFAULT_WEIGHTS } from "../src/lib/matching/matcher";
 import { buildIndex } from "../src/lib/profile-index";
 
 declare const claude: any;
 const KEY = "sco.v1";
-type Resume = { id: string; name: string; addedAt: string; profile: Profile };
-type Store = { profile: Profile | null; apps: AppRecord[]; resumes: Resume[] };
-const load = (): Store => { try { const s = JSON.parse(localStorage.getItem(KEY) || ""); return { profile: s.profile ? ProfileSchema.parse(s.profile) : null, apps: s.apps ?? [], resumes: (s.resumes ?? []).map((r: Resume) => ({ ...r, profile: ProfileSchema.parse(r.profile) })) }; } catch { return { profile: null, apps: [], resumes: [] }; } };
+type Resume = { id: string; name: string; addedAt: string; profile: Profile; ats?: AtsReport | null };
+type Prefs = { weights?: Record<string, number>; theme: string; vocab: VocabEntry[] };
+type Store = { profile: Profile | null; apps: AppRecord[]; resumes: Resume[]; prefs: Prefs };
+const DEFAULT_PREFS: Prefs = { theme: "plain", vocab: [] };
+const load = (): Store => { try { const s = JSON.parse(localStorage.getItem(KEY) || ""); const prefs = { ...DEFAULT_PREFS, ...(s.prefs ?? {}) }; ontology.setCustom(prefs.vocab); return { profile: s.profile ? ProfileSchema.parse(s.profile) : null, apps: s.apps ?? [], resumes: (s.resumes ?? []).map((r: Resume) => ({ ...r, profile: ProfileSchema.parse(r.profile) })), prefs }; } catch { return { profile: null, apps: [], resumes: [], prefs: DEFAULT_PREFS }; } };
 let persistWarned = false;
 const persist = (s: Store) => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { if (!persistWarned) { persistWarned = true; } } };
 
@@ -28,7 +36,7 @@ const errCopy = (e: any) => (e?.code === "not_granted" ? "Claude access was decl
 
 function App() {
   const [store, setStore] = useState<Store>(load);
-  const [view, setView] = useState<"profile" | "analyze" | "apps" | "analytics" | "deck" | "settings">("profile");
+  const [view, setView] = useState<"profile" | "analyze" | "apps" | "versions" | "analytics" | "deck" | "settings">("profile");
   const [openId, setOpenId] = useState<string | null>(null);
   const [sample, setSample] = useState<any>(null);
   const [downloads, setDownloads] = useState<any>(null);
@@ -53,7 +61,7 @@ function App() {
   const updateApp = (a: AppRecord) => setStore((s) => ({ ...s, apps: s.apps.map((x) => (x.id === a.id ? a : x)) }));
   const open = store.apps.find((a) => a.id === openId) ?? null;
 
-  const nav: [typeof view, string][] = [["profile", "Profile"], ["analyze", "Analyze a job"], ["apps", `Applications (${store.apps.length})`], ["analytics", "Analytics"], ["deck", "Presentation"], ["settings", "Settings"]];
+  const nav: [typeof view, string][] = [["profile", "Profile"], ["analyze", "Analyze a job"], ["apps", `Applications (${store.apps.length})`], ["versions", "Versions"], ["analytics", "Analytics"], ["deck", "Presentation"], ["settings", "Settings"]];
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line py-4">
@@ -68,12 +76,13 @@ function App() {
       {toast && <div role={toast.tone === "err" ? "alert" : "status"} className={cx("mb-3 rounded-md border p-3 text-sm", toast.tone === "err" ? "border-red-300 bg-red-50 text-red-800" : "border-green-300 bg-green-50 text-green-800")}>{toast.text}</div>}
 
       {view === "profile" && <ProfileView profile={store.profile} setProfile={setProfile} resumes={store.resumes} setResumes={(f: (r: Resume[]) => Resume[]) => setStore((s) => ({ ...s, resumes: f(s.resumes) }))} provider={provider} run={run} say={say} claudeOn={!!transport} goAnalyze={() => setView("analyze")} />}
-      {view === "analyze" && <AnalyzeView profile={store.profile} run={run} say={say} onDone={(a: AppRecord) => { setStore((s) => ({ ...s, apps: [a, ...s.apps] })); setOpenId(a.id); setView("apps"); }} provider={provider} claudeOn={!!transport} />}
+      {view === "analyze" && <AnalyzeView weights={store.prefs.weights} profile={store.profile} run={run} say={say} onDone={(a: AppRecord) => { setStore((s) => ({ ...s, apps: [a, ...s.apps] })); setOpenId(a.id); setView("apps"); }} provider={provider} claudeOn={!!transport} />}
       {view === "apps" && !open && <AppsList apps={store.apps} open={setOpenId} />}
-      {view === "apps" && open && store.profile && <AppDetail key={open.id} app={open} profile={store.profile} update={updateApp} back={() => setOpenId(null)} remove={() => { setStore((s) => ({ ...s, apps: s.apps.filter((x) => x.id !== open.id) })); setOpenId(null); }} provider={provider} run={run} say={say} downloads={downloads} />}
+      {view === "apps" && open && store.profile && <AppDetail key={open.id} theme={store.prefs.theme} app={open} profile={store.profile} update={updateApp} back={() => setOpenId(null)} remove={() => { setStore((s) => ({ ...s, apps: s.apps.filter((x) => x.id !== open.id) })); setOpenId(null); }} provider={provider} run={run} say={say} downloads={downloads} />}
+      {view === "versions" && <VersionsView apps={store.apps} open={(id: string) => { setOpenId(id); setView("apps"); }} />}
       {view === "analytics" && <AnalyticsView apps={store.apps} open={(id: string) => { setOpenId(id); setView("apps"); }} />}
       {view === "deck" && <DeckView profile={store.profile} apps={store.apps} downloads={downloads} say={say} />}
-      {view === "settings" && <SettingsView store={store} setStore={setStore} downloads={downloads} say={say} claudeOn={!!sample} />}
+      {view === "settings" && <SettingsView store={store} setStore={setStore} setPrefs={(f: (p: Prefs) => Prefs) => setStore((s) => { const prefs = f(s.prefs); ontology.setCustom(prefs.vocab); return { ...s, prefs }; })} downloads={downloads} say={say} claudeOn={!!sample} />}
     </div>
   );
 }
@@ -88,10 +97,10 @@ function ProfileView({ profile, setProfile, resumes, setResumes, provider, run, 
   const [paste, setPaste] = useState("");
   const [report, setReport] = useState<MergeReport | null>(null);
   const [items, setItems] = useState<MergeItem[]>([]);
-  const addResume = async (name: string, text: string, existing: Resume[]) => {
-    if (text.trim().length < 200) throw new Error(`${name}: almost no text found. Use a text-based PDF, DOCX or TXT, or paste the text.`);
+  const addResume = async (name: string, text: string, existing: Resume[], layout?: any) => {
+    if (text.trim().length < 200) throw new Error(`${name}: almost no text found. This looks like a scanned/image file, which an ATS cannot read either. Use a text-based PDF, DOCX or TXT, or paste the text.`);
     const parsed: Profile = await provider.analyzeResume(text);
-    return [...existing, { id: `res${Date.now().toString(36)}${existing.length}`, name, addedAt: new Date().toISOString(), profile: parsed }];
+    return [...existing, { id: `res${Date.now().toString(36)}${existing.length}`, name, addedAt: new Date().toISOString(), profile: parsed, ats: atsParse(text, layout) }];
   };
   const afterAdd = (all: Resume[]) => {
     setResumes(() => all);
@@ -101,7 +110,7 @@ function ProfileView({ profile, setProfile, resumes, setResumes, provider, run, 
   };
   const onFiles = (files: File[]) => run(claudeOn ? "Reading resumes with Claude…" : "Reading resumes…", async () => {
     let all: Resume[] = resumes;
-    for (const f of files) all = await addResume(f.name, await extractBrowser(f), all);
+    for (const f of files) { const ex = await extractWithLayout(f); all = await addResume(f.name, ex.text, all, ex.layout); }
     afterAdd(all);
   });
   const decide = (id: string, decision: MergeItem["decision"]) => setItems((xs) => xs.map((x) => (x.id === id ? { ...x, decision } : x)));
@@ -118,8 +127,8 @@ function ProfileView({ profile, setProfile, resumes, setResumes, provider, run, 
           <Button variant="outline" onClick={() => { setProfile(parseResumeHeuristic(DEMO_RESUME_TEXT)); say("ok", "Fictional demo profile ready."); }}>Load demo profile</Button>
           {resumes.length > 0 && profile && <Button variant="outline" onClick={() => { const r = mergeResumes(resumes.map((x: Resume) => ({ id: x.id, name: x.name, profile: x.profile })), profile); setReport(r); setItems(r.items); }}>Re-analyse library against profile</Button>}
         </div>
-        <details><summary className="cursor-pointer text-sm underline">Paste resume text instead</summary><Textarea id="resume-paste" rows={8} className="mt-2" value={paste} onChange={(e) => setPaste(e.target.value)} /><Button className="mt-2" variant="outline" disabled={paste.length < 50} onClick={() => run("Parsing…", async () => { afterAdd(await addResume(`pasted-${resumes.length + 1}.txt`, paste, resumes)); setPaste(""); })}>Add pasted resume</Button></details>
-        {resumes.length > 0 && <ul className="divide-y divide-line rounded-md border border-line text-sm">{resumes.map((r: Resume) => <li key={r.id} className="flex items-center justify-between gap-2 p-2"><span><b>{r.name}</b> <span className="text-gray-500">· {r.profile.roles.length} roles, {r.profile.roles.reduce((a, x) => a + x.responsibilities.length + x.achievements.length, 0)} bullets · {r.profile.roles[0]?.title ?? "no roles found"}</span></span><button className="text-xs text-red-800 underline" onClick={() => setResumes((xs: Resume[]) => xs.filter((x) => x.id !== r.id))}>Remove</button></li>)}</ul>}
+        <details><summary className="cursor-pointer text-sm underline">Paste resume text instead</summary><Textarea id="resume-paste" aria-label="Resume text" rows={8} className="mt-2" value={paste} onChange={(e) => setPaste(e.target.value)} /><Button className="mt-2" variant="outline" disabled={paste.length < 50} onClick={() => run("Parsing…", async () => { afterAdd(await addResume(`pasted-${resumes.length + 1}.txt`, paste, resumes)); setPaste(""); })}>Add pasted resume</Button></details>
+        {resumes.length > 0 && <ul className="divide-y divide-line rounded-md border border-line text-sm">{resumes.map((r: Resume) => <li key={r.id} className="flex items-center justify-between gap-2 p-2"><span><b>{r.name}</b> <span className="text-gray-500">· {r.profile.roles.length} roles, {r.profile.roles.reduce((a, x) => a + x.responsibilities.length + x.achievements.length, 0)} bullets · {r.profile.roles[0]?.title ?? "no roles found"}</span> {r.ats && <span title={r.ats.checks.filter((c) => c.status !== "pass").map((c) => `${c.label}: ${c.detail}`).join("\n") || "No ATS issues found"}><Badge tone={r.ats.risk === "Low" ? "green" : r.ats.risk === "Medium" ? "amber" : "red"}>ATS {r.ats.risk}</Badge></span>}</span><button className="text-xs text-red-800 underline" onClick={() => setResumes((xs: Resume[]) => xs.filter((x) => x.id !== r.id))}>Remove</button></li>)}</ul>}
       </Card>
 
       {report && (
@@ -188,7 +197,7 @@ function ProfileEditor({ profile: p, setProfile, say, goAnalyze }: { profile: Pr
 }
 
 /* ---------- Analyze ---------- */
-function AnalyzeView({ profile, run, say, onDone, provider, claudeOn }: any) {
+function AnalyzeView({ profile, run, say, onDone, provider, claudeOn, weights }: any) {
   const [jd, setJd] = useState("");
   const [f, setF] = useState({ company: "", title: "", country: "USA", seniority: "Principal", length: "3", url: "" });
   const set = (k: string) => (e: React.ChangeEvent<any>) => setF({ ...f, [k]: e.target.value });
@@ -208,7 +217,7 @@ function AnalyzeView({ profile, run, say, onDone, provider, claudeOn }: any) {
         <div><Label htmlFor="ct">Target country</Label><Select id="ct" value={f.country} onChange={set("country")}>{COUNTRY_NAMES.map((c) => <option key={c}>{c}</option>)}</Select></div>
         <div><Label htmlFor="sn">Desired seniority</Label><Select id="sn" value={f.seniority} onChange={set("seniority")}>{["Engineer", "Senior", "Staff", "Principal", "Architect", "Lead", "Manager"].map((c) => <option key={c}>{c}</option>)}</Select></div>
         <div><Label htmlFor="ln">Resume length</Label><Select id="ln" value={f.length} onChange={set("length")}>{[["1", "1 page"], ["2", "2 pages"], ["3", "3 pages"], ["4", "4 pages"], ["cv", "Detailed technical CV"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select></div>
-        <Button className="w-full" disabled={jd.length < 80} onClick={() => run(claudeOn ? "Analyzing with Claude…" : "Analyzing…", async () => onDone(await analyze(profile, provider, { jdText: jd, jobUrl: f.url, company: f.company, title: f.title, settings: SettingsSchema.parse({ targetRole: f.title, country: f.country, seniority: f.seniority, length: f.length }) })))}>Analyze match</Button>
+        <Button className="w-full" disabled={jd.length < 80} onClick={() => run(claudeOn ? "Analyzing with Claude…" : "Analyzing…", async () => onDone(await analyze(profile, provider, { jdText: jd, jobUrl: f.url, company: f.company, title: f.title, settings: SettingsSchema.parse({ targetRole: f.title, country: f.country, seniority: f.seniority, length: f.length, weights }) })))}>Analyze match</Button>
       </Card>
     </div>
   );
@@ -244,8 +253,8 @@ function AppsList({ apps: all, open }: { apps: AppRecord[]; open: (id: string) =
   );
 }
 
-const TABS = ["Overview", "Requirements", "Skill Match", "Resume Changes", "Cover Letter", "LinkedIn", "Recruiter Messages", "Interview Prep", "Truth Audit", "Tracking"];
-function AppDetail({ app: a, profile, update, back, remove, provider, run, say, downloads }: any) {
+const TABS = ["Overview", "Strategy", "Requirements", "Skill Match", "Resume Changes", "Cover Letter", "LinkedIn", "Recruiter Messages", "Interview Prep", "Truth Audit", "Tracking"];
+function AppDetail({ app: a, profile, update, back, remove, provider, run, say, downloads, theme }: any) {
   const [tab, setTab] = useState("Overview");
   const doc = useMemo(() => { try { return a.tailored ? finalDocs(a, profile) : null; } catch { return null; } }, [a, profile]);
   return (
@@ -255,10 +264,11 @@ function AppDetail({ app: a, profile, update, back, remove, provider, run, say, 
         <Badge tone={a.match.overall >= 75 ? "green" : a.match.overall >= 55 ? "amber" : "red"} className="text-base">{a.match.recommendation.verdict} · {a.match.overall}</Badge>
       </div>
       <div role="tablist" className="flex flex-wrap border-b border-line">{TABS.map((t) => <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cx("border-b-2 px-3 py-2 text-sm", tab === t ? "border-ink font-medium" : "border-transparent text-gray-600")}>{t}</button>)}</div>
-      {tab === "Overview" && <Overview a={a} />}
+      {tab === "Overview" && <Overview a={a} profile={profile} />}
+      {tab === "Strategy" && <StrategyTab a={a} profile={profile} />}
       {tab === "Requirements" && <Requirements a={a} />}
       {tab === "Skill Match" && <SkillMatch a={a} />}
-      {tab === "Resume Changes" && <ResumeChanges a={a} profile={profile} update={update} provider={provider} run={run} say={say} doc={doc} downloads={downloads} />}
+      {tab === "Resume Changes" && <ResumeChanges a={a} profile={profile} update={update} provider={provider} run={run} say={say} doc={doc} downloads={downloads} theme={a.theme ?? theme} setTheme={(t: string) => update({ ...a, theme: t })} />}
       {tab === "Cover Letter" && <CoverLetterTab a={a} profile={profile} update={update} provider={provider} run={run} say={say} doc={doc} downloads={downloads} />}
       {tab === "LinkedIn" && <LinkedInTab a={a} profile={profile} update={update} provider={provider} run={run} say={say} />}
       {tab === "Recruiter Messages" && <OutreachTab a={a} profile={profile} update={update} provider={provider} run={run} say={say} />}
@@ -269,7 +279,8 @@ function AppDetail({ app: a, profile, update, back, remove, provider, run, say, 
   );
 }
 
-function Overview({ a }: { a: AppRecord }) {
+function Overview({ a, profile }: { a: AppRecord; profile: Profile }) {
+  const issues = useMemo(() => auditCredibility(profile), [profile]);
   const [open, setOpen] = useState("overall");
   const sel = a.match.scores.find((s) => s.key === open);
   return (
@@ -283,6 +294,7 @@ function Overview({ a }: { a: AppRecord }) {
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <Card><h3 className="mb-2 text-sm font-semibold">Gaps</h3>{a.match.gaps.length ? a.match.gaps.map((g) => <div key={g.term} className="border-b border-line py-2 text-sm last:border-0"><b>{g.term}</b> <Badge tone={g.gap === "critical" ? "red" : g.gap === "medium" ? "amber" : "gray"}>{g.gap}</Badge> <Badge tone={g.kind === "presentation-gap" ? "blue" : "gray"}>{g.kind === "presentation-gap" ? "presentation gap" : "real skill gap"}</Badge><p className="mt-1 text-gray-600">{g.recommendation}</p></div>) : <p className="text-sm text-gray-500">No gaps found.</p>}</Card>
+        <Card className="md:col-span-2"><h3 className="mb-2 text-sm font-semibold">Technical credibility <span className="font-normal text-gray-500">· things an interviewer or recruiter may question in your profile</span></h3>{issues.length ? issues.map((i, k) => <div key={k} className="border-b border-line py-2 text-sm last:border-0"><Badge tone={i.severity === "high" ? "red" : i.severity === "medium" ? "amber" : "gray"}>{i.severity}</Badge> <b>{i.area}</b>: {i.message}<p className="text-xs text-gray-600"><b>Fix:</b> {i.fix}</p></div>) : <p className="text-sm text-gray-500">No credibility issues found.</p>}</Card>
         <Card><h3 className="mb-2 text-sm font-semibold">Weak bullets in your resume</h3>{a.match.seniority.weakBullets.slice(0, 8).map((w, i) => <div key={i} className="border-b border-line py-2 text-sm last:border-0">“{w.text}”<p className="text-xs text-gray-500">{w.reason}</p></div>)}{!a.match.seniority.weakBullets.length && <p className="text-sm text-gray-500">None detected.</p>}</Card>
       </div>
     </div>
@@ -313,21 +325,22 @@ async function save(downloads: any, filename: string, data: Blob | ArrayBuffer, 
   try { await downloads.save({ filename, data }); say("ok", `Saved ${filename}.`); } catch (e: any) { if (e?.code !== "declined") say("err", `Could not save: ${e?.message ?? e?.code}`); }
 }
 
-function DownloadRow({ a, profile, doc, kinds, downloads, say }: any) {
+function DownloadRow({ a, profile, doc, kinds, downloads, say, theme }: any) {
   const name = profile.identity.name || "Candidate";
   const guard = (ok: boolean, claims: any[]) => { if (!ok) { say("err", "POTENTIAL HALLUCINATION: unsupported claims remain. " + claims.map((c: any) => `“${c.text}” — ${c.reasons.join(" ")}`).join(" | ")); return false; } return true; };
+  const fitted = () => fitResume(doc.resume, a.settings.length, theme);
   const act: Record<string, () => Promise<void>> = {
-    "resume-pdf": async () => { if (guard(doc.audit.passed, doc.audit.hallucinations)) await save(downloads, packName(name, a.company, "Resume", "pdf"), resumePdf(doc.resume, a.settings.length), say); },
-    "resume-docx": async () => { if (guard(doc.audit.passed, doc.audit.hallucinations)) await save(downloads, packName(name, a.company, "Resume", "docx"), await resumeDocxBlob(doc.resume), say); },
+    "resume-pdf": async () => { if (guard(doc.audit.passed, doc.audit.hallucinations)) { const f = fitted(); await save(downloads, packName(name, a.company, "Resume", "pdf"), resumePdf(f.resume, a.settings.length, theme).data, say); } },
+    "resume-docx": async () => { if (guard(doc.audit.passed, doc.audit.hallucinations)) { const f = fitted(); await save(downloads, packName(name, a.company, "Resume", "docx"), await resumeDocxBlob(f.resume, theme), say); } },
     "cover-pdf": async () => { if (guard(!doc.letterAudit || doc.letterAudit.passed, doc.letterAudit?.hallucinations ?? [])) await save(downloads, packName(name, a.company, "CoverLetter", "pdf"), coverLetterPdf(a.letter, profile.identity), say); },
     "cover-docx": async () => { if (guard(!doc.letterAudit || doc.letterAudit.passed, doc.letterAudit?.hallucinations ?? [])) await save(downloads, packName(name, a.company, "CoverLetter", "docx"), await coverDocxBlob(a.letter, profile.identity), say); },
-    "report-pdf": async () => save(downloads, packName(name, a.company, "MatchReport", "pdf"), reportPdf({ candidate: name, company: a.company, role: a.roleTitle, jd: a.jd, match: a.match, audit: doc?.audit }), say),
+    "report-pdf": async () => save(downloads, packName(name, a.company, "MatchReport", "pdf"), reportPdf({ candidate: name, company: a.company, role: a.roleTitle, jd: a.jd, match: a.match, audit: doc?.audit, strategy: planStrategy(profile, a.jd, a.match, a.settings), credibility: auditCredibility(profile) }), say),
   };
   const L: Record<string, string> = { "resume-pdf": "Resume (PDF)", "resume-docx": "Resume (DOCX)", "cover-pdf": "Cover letter (PDF)", "cover-docx": "Cover letter (DOCX)", "report-pdf": "Match report (PDF)" };
   return <div className="flex flex-wrap gap-2">{kinds.map((k: string) => <Button key={k} variant="outline" disabled={!downloads || !doc} onClick={act[k]}>Download {L[k]}</Button>)}{!downloads && <span className="self-center text-xs text-gray-500">File saving is only available when this page runs inside Claude.</span>}</div>;
 }
 
-function ResumeChanges({ a, profile, update, provider, run, say, doc, downloads }: any) {
+function ResumeChanges({ a, profile, update, provider, run, say, doc, downloads, theme, setTheme }: any) {
   const [edit, setEdit] = useState<{ id: string; text: string } | null>(null);
   const gen = () => run("Generating application pack…", async () => update(await generate(profile, provider, a)));
   const act = (id: string, d: any, text?: string) => { try { const r = decide(a, profile, id, d, text); update(r.app); setEdit(null); if (r.warning) say("err", r.warning); } catch (e: any) { say("err", e.message); } };
@@ -349,8 +362,65 @@ function ResumeChanges({ a, profile, update, provider, run, say, doc, downloads 
           <div className="mt-3 flex gap-2">{edit && edit.id === c.id ? <><Button size="sm" onClick={() => act(c.id, "edited", edit.text)}>Save edit</Button><Button size="sm" variant="ghost" onClick={() => setEdit(null)}>Cancel</Button></> : <><Button size="sm" disabled={c.status === "UNSUPPORTED"} onClick={() => act(c.id, "accepted")}>Accept</Button><Button size="sm" variant="outline" onClick={() => act(c.id, "rejected")}>Reject</Button><Button size="sm" variant="ghost" onClick={() => setEdit({ id: c.id, text: c.decision === "edited" && c.finalText ? c.finalText : c.proposed })}>Edit</Button></>}</div>
         </Card>
       ))}
-      {doc && <Card><h3 className="mb-2 text-sm font-semibold">Resume as it will be exported</h3><ResumePreview r={doc.resume} /><div className="mt-4"><DownloadRow a={a} profile={profile} doc={doc} kinds={["resume-pdf", "resume-docx"]} downloads={downloads} say={say} /></div></Card>}
+      {doc && <ExportCard a={a} profile={profile} doc={doc} downloads={downloads} say={say} theme={theme} setTheme={setTheme} run={run} />}
     </div>
+  );
+}
+
+
+function ExportCard({ a, profile, doc, downloads, say, theme, setTheme, run }: any) {
+  const [ats, setAts] = useState<AtsReport | null>(null);
+  const fit = useMemo(() => fitResume(doc.resume, a.settings.length, theme), [doc.resume, a.settings.length, theme]);
+  const th = themeById(theme);
+  const check = () => run("Running ATS check on the exported PDF…", async () => {
+    const pdf = resumePdf(fit.resume, a.settings.length, theme);
+    const ex = await extractPdfBytes(pdf.data.slice(0));
+    setAts(atsParse(ex.text, ex.layout));
+  });
+  return (
+    <Card className="space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h3 className="text-sm font-semibold">Resume as it will be exported</h3>
+        <div className="flex items-end gap-3"><div><Label htmlFor="theme">Design theme</Label><Select id="theme" value={theme} onChange={(e) => setTheme(e.target.value)}>{THEMES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}</Select></div><Badge tone={th.risk === "Low" ? "green" : "amber"}>ATS risk: {th.risk}</Badge></div>
+      </div>
+      <p className="text-xs text-gray-500">{th.note}</p>
+      <p className="text-sm">{fit.target ? <>Fits <b>{fit.pages}</b> page(s) of the {fit.target} requested{fit.trimmed ? <>; <b>{fit.trimmed}</b> lowest-ranked item(s) left out to fit (nothing reworded).</> : "."}{fit.pages > fit.target && <span className="text-amber-800"> Still over the target: shorten the profile text or choose more pages.</span>}</> : <>Detailed CV: {fit.pages} page(s), nothing trimmed.</>}</p>
+      <ResumePreview r={fit.resume} />
+      <div className="flex flex-wrap items-center gap-2"><DownloadRow a={a} profile={profile} doc={doc} kinds={["resume-pdf", "resume-docx"]} downloads={downloads} say={say} theme={theme} /><Button variant="outline" onClick={check}>Run ATS check on this PDF</Button></div>
+      {ats && <AtsPanel r={ats} />}
+    </Card>
+  );
+}
+
+function AtsPanel({ r }: { r: AtsReport }) {
+  return (
+    <div className="space-y-3 rounded-md border border-line p-3">
+      <div className="flex items-center gap-2"><b className="text-sm">ATS parse risk</b><Badge tone={r.risk === "Low" ? "green" : r.risk === "Medium" ? "amber" : "red"}>{r.risk}</Badge></div>
+      <ul className="space-y-1 text-sm">{r.checks.map((c) => <li key={c.id} className="flex gap-2"><span className={cx("w-4 font-mono", c.status === "pass" ? "text-green-800" : c.status === "warn" ? "text-amber-800" : "text-red-800")}>{c.status === "pass" ? "✓" : c.status === "warn" ? "△" : "✗"}</span><span><b>{c.label}.</b> {c.detail}</span></li>)}</ul>
+      <div className="grid gap-3 md:grid-cols-2">
+        <div><Label>What the parser extracted</Label><dl className="text-sm"><div><dt className="inline text-gray-500">Name: </dt>{r.extracted.name || "—"}</div><div><dt className="inline text-gray-500">Email: </dt>{r.extracted.email || "—"}</div><div><dt className="inline text-gray-500">Phone: </dt>{r.extracted.phone || "—"}</div><div><dt className="inline text-gray-500">Sections: </dt>{r.extracted.sections.join(", ") || "—"}</div></dl><ul className="mt-1 text-sm">{r.extracted.roles.map((x, i) => <li key={i}>{x.title || "?"} · {x.employer || "?"} · {x.dates || "no dates"}</li>)}</ul></div>
+        <div><Label>Raw extracted text, in reading order</Label><pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded bg-gray-50 p-2 text-xs">{r.text}</pre></div>
+      </div>
+    </div>
+  );
+}
+
+function StrategyTab({ a, profile }: { a: AppRecord; profile: Profile }) {
+  const st = useMemo(() => planStrategy(profile, a.jd, a.match, a.settings), [a, profile]);
+  return (
+    <div className="space-y-4">
+      <Card><h3 className="text-sm font-semibold">Application strategy · {st.headline}</h3><p className="mt-1 text-xs text-gray-500">Advice derived from the analysis. It quotes your own evidence and never suggests claiming anything your profile does not support.</p></Card>
+      <div className="grid gap-4 md:grid-cols-2">{st.sections.map((sec) => <Card key={sec.title}><h4 className="mb-2 text-sm font-semibold">{sec.title}</h4><ul className="list-disc space-y-1 pl-5 text-sm text-gray-700">{sec.items.map((it, i) => <li key={i}>{it}</li>)}</ul></Card>)}</div>
+    </div>
+  );
+}
+
+function VersionsView({ apps, open }: { apps: AppRecord[]; open: (id: string) => void }) {
+  const packs = apps.filter((a) => a.tailored);
+  if (!packs.length) return <Card className="text-sm text-gray-600">No generated packs yet. Open an application and generate its pack on the Resume Changes tab.</Card>;
+  return (
+    <Card className="overflow-x-auto p-0"><table className="w-full text-sm"><thead className="border-b border-line text-left text-xs uppercase text-gray-500"><tr><th className="p-3">Job</th><th>Pack</th><th>Generated</th><th>Changes accepted</th><th>Cover letter</th><th>Theme</th></tr></thead>
+      <tbody>{packs.map((a) => { const acc = a.changes.filter((c) => c.decision === "accepted" || c.decision === "edited").length; return <tr key={a.id} className="border-b border-line last:border-0 hover:bg-gray-50"><td className="p-3"><button className="text-left underline" onClick={() => open(a.id)}>{a.roleTitle || "Untitled"}</button><div className="text-xs text-gray-500">{a.company}</div></td><td className="font-mono">v{a.packVersion ?? 1}</td><td>{a.packAt ? new Date(a.packAt).toLocaleDateString() : "–"}</td><td>{acc}/{a.changes.length}</td><td>{a.letter ? `${a.letter.wordCount} words` : "–"}</td><td>{themeById(a.theme).label}</td></tr>; })}</tbody></table></Card>
   );
 }
 
@@ -364,6 +434,7 @@ function ResumePreview({ r }: { r: any }) {
       {r.competencies.length > 0 && <Sec t="Core competencies"><p>{r.competencies.join(" • ")}</p></Sec>}
       <Sec t="Technical skills">{r.skills.map((s: any) => <p key={s.label}><b>{s.label}:</b> {s.items.join(", ")}</p>)}</Sec>
       <Sec t="Professional experience">{r.experience.map((e: any) => <div key={e.roleId} className="mb-2"><div className="font-semibold">{[e.title, e.employer].filter(Boolean).join(", ")}</div><div className="text-xs italic text-gray-600">{[e.dates, e.location].filter(Boolean).join(" | ")}</div><ul className="list-disc pl-5">{e.bullets.map((b: any, i: number) => <li key={i}>{b.text}</li>)}</ul></div>)}</Sec>
+      {(r.projects ?? []).length > 0 && <Sec t="Major technical projects">{r.projects.map((p: any) => <div key={p.name} className="mb-2"><div className="font-semibold">{p.name}{p.sub && <span className="font-normal italic text-gray-600"> ({p.sub})</span>}</div><ul className="list-disc pl-5">{p.bullets.map((b: string, i: number) => <li key={i}>{b}</li>)}</ul></div>)}</Sec>}
       {r.education.length > 0 && <Sec t="Education">{r.education.map((e: string, i: number) => <p key={i}>{e}</p>)}</Sec>}
     </div>
   );
@@ -379,7 +450,7 @@ function CoverLetterTab({ a, profile, update, provider, run, say, doc, downloads
     <div className="space-y-4">
       <Card className="space-y-3">
         <div className="flex items-center justify-between text-sm"><span>{a.letter.date} · {a.letter.salutation}</span><Badge tone={words >= 250 && words <= 400 ? "green" : "amber"}>{words} words (target 250–400)</Badge></div>
-        {paras.map((p, i) => <Textarea key={i} id={`cl-${i}`} rows={Math.max(3, Math.ceil(p.length / 95))} value={p} onChange={(e) => setParas(paras.map((x, j) => (j === i ? e.target.value : x)))} />)}
+        {paras.map((p, i) => <Textarea key={i} id={`cl-${i}`} aria-label={`Cover letter paragraph ${i + 1}`} rows={Math.max(3, Math.ceil(p.length / 95))} value={p} onChange={(e) => setParas(paras.map((x, j) => (j === i ? e.target.value : x)))} />)}
         <div className="text-sm">{a.letter.closing}<br /><b>{a.letter.signature}</b></div>
         <div className="flex gap-2"><Button onClick={() => { try { update(saveLetter(a, profile, paras)); setErr(""); say("ok", "Cover letter saved."); } catch (e: any) { setErr(e.message); } }}>Save edits</Button><Button variant="outline" onClick={() => run("Writing cover letter…", async () => update({ ...a, letter: await provider.generateCoverLetter(profile, a.jd, a.match, a.settings) }))}>Regenerate</Button></div>
         {err && <div role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">{err}</div>}
@@ -401,7 +472,7 @@ function TruthAudit({ a, doc, profile, downloads, say }: any) {
         <p className="mt-2 text-sm text-gray-600">{doc.audit.passed && (!doc.letterAudit || doc.letterAudit.passed) ? "No unsupported claims. Exports are enabled." : "Unsupported claims found. Exports are blocked until they are fixed."}</p></Card>
       {flagged.length > 0 && <Card><h3 className="mb-2 text-sm font-semibold">Needs your attention</h3>{flagged.map((c: any, i: number) => <div key={i} className="border-b border-line py-2 text-sm last:border-0"><Badge tone={statusTone(c.status)}>{c.status}</Badge> {c.hallucination && <Badge tone="red">POTENTIAL HALLUCINATION</Badge>} “{c.text}”<ul className="mt-1 list-disc pl-5 text-gray-600">{c.reasons.map((r: string, j: number) => <li key={j}>{r}</li>)}</ul></div>)}</Card>}
       <Card><h3 className="mb-2 text-sm font-semibold">All resume claims</h3><div className="max-h-96 overflow-auto">{doc.audit.checks.map((c: any, i: number) => <div key={i} className="flex items-start gap-2 border-b border-line py-1.5 text-sm last:border-0"><Badge tone={statusTone(c.status)} className="shrink-0">{c.status}</Badge><span>{c.text}{c.evidence && c.status !== "VERIFIED" && <span className="block text-xs text-gray-500">Evidence: {c.evidence}</span>}</span></div>)}</div></Card>
-      <DownloadRow a={a} profile={profile} doc={doc} kinds={["report-pdf"]} downloads={downloads} say={say} />
+      <DownloadRow a={a} profile={profile} doc={doc} kinds={["report-pdf"]} downloads={downloads} say={say} theme={undefined} />
     </div>
   );
 }
@@ -413,6 +484,7 @@ function Tracking({ a, update, remove, say }: any) {
   return (
     <Card className="max-w-3xl space-y-3">
       <div className="grid gap-3 md:grid-cols-2">
+        <div className="md:col-span-2 text-sm text-gray-600">Resume version used: <b>{a.packVersion ? `v${a.packVersion}` : "none generated yet"}</b>{a.packAt && ` · ${new Date(a.packAt).toLocaleDateString()}`}</div>
         <div><Label htmlFor="t-status">Status</Label><Select id="t-status" value={f.status} onChange={set("status")}>{STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}</Select></div>
         <div><Label htmlFor="t-date">Application date</Label><Input id="t-date" type="date" value={f.appliedAt} onChange={set("appliedAt")} /></div>
         <div><Label htmlFor="t-co">Company</Label><Input id="t-co" value={f.company} onChange={set("company")} /></div>
@@ -459,11 +531,12 @@ function LinkedInTab({ a, profile, update, provider, run, say }: any) {
           {p.headlines.map((h: any) => <div key={h.kind} className="rounded-md border border-line p-3"><div className="mb-1 flex flex-wrap items-center gap-2"><b className="text-sm">{h.kind}</b><Badge tone={statusTone(h.status)}>{h.status}</Badge><span className="font-mono text-xs text-gray-500">{h.length}/220</span></div><p className="text-sm">{h.text}</p><Button size="sm" variant="outline" className="mt-2" onClick={() => copy(h.text, say)}>Copy</Button></div>)}
           {p.skippedHeadlines.map((s: any) => <p key={s.kind} className="text-sm text-gray-500"><b>{s.kind}</b> not generated: {s.why}</p>)}
         </Card>
-        <Card className="space-y-2"><h3 className="text-sm font-semibold">About</h3><Textarea readOnly rows={12} value={p.about.text} /><div className="flex items-center gap-3"><Button size="sm" variant="outline" onClick={() => copy(p.about.text, say)}>Copy</Button><span className="font-mono text-xs text-gray-500">{p.about.text.length}/2600</span></div></Card>
+        <Card className="space-y-2"><h3 className="text-sm font-semibold">About</h3><Textarea readOnly aria-label="Suggested About section" rows={12} value={p.about.text} /><div className="flex items-center gap-3"><Button size="sm" variant="outline" onClick={() => copy(p.about.text, say)}>Copy</Button><span className="font-mono text-xs text-gray-500">{p.about.text.length}/2600</span></div></Card>
         <div className="grid gap-4 md:grid-cols-2">
           <Card><h3 className="mb-2 text-sm font-semibold">Skills order (top 50, from your profile)</h3><ol className="list-decimal pl-5 text-sm columns-2">{p.skills.map((k: string) => <li key={k}>{k}</li>)}</ol></Card>
           <Card><h3 className="mb-2 text-sm font-semibold">Recruiter keywords to consider</h3>{p.missingKeywords.length ? p.missingKeywords.map((k: any) => <div key={k.keyword} className="border-b border-line py-2 text-sm last:border-0"><b>{k.keyword}</b><p className="text-gray-600">{k.why}</p></div>) : <p className="text-sm text-gray-500">No presentation gaps for this job.</p>}</Card>
         </div>
+        <Card><h3 className="mb-2 text-sm font-semibold">Featured section ideas</h3>{(p.featured ?? []).map((f: any, i: number) => <div key={i} className="border-b border-line py-2 text-sm last:border-0"><b>{f.item}</b><p className="text-gray-600">{f.why}</p></div>)}</Card>
         <Card><h3 className="mb-2 text-sm font-semibold">Experience: lead with these</h3>{p.experience.map((e: any) => <div key={e.roleLabel} className="border-b border-line py-2 text-sm last:border-0"><b>{e.roleLabel}</b><ul className="mt-1 text-gray-700">{e.lead.map((b: string, i: number) => <li key={i}>{b}</li>)}</ul>{e.weak.length > 0 && <p className="mt-1 text-xs text-gray-500">Weak or generic here (rewrite before reusing): {e.weak.map((w: string) => `“${w}”`).join("; ")}</p>}</div>)}</Card>
         {p.current && <Card><h3 className="mb-2 text-sm font-semibold">Your current profile</h3>{p.current.headline && <p className="text-sm">Headline ({p.current.headline.length}/220): has {p.current.headline.present.join(", ") || "none of the tracked keywords"}; missing {p.current.headline.missing.join(", ") || "nothing"}.</p>}{p.current.about && <p className="text-sm">About: has {p.current.about.present.join(", ") || "none of the tracked keywords"}; missing {p.current.about.missing.join(", ") || "nothing"}.</p>}</Card>}
         <Card><ul className="list-disc space-y-1 pl-5 text-sm text-gray-700">{p.notes.map((n: string, i: number) => <li key={i}>{n}</li>)}</ul></Card>
@@ -490,7 +563,7 @@ function OutreachTab({ a, profile, update, provider, run, say }: any) {
       {pack?.messages.map((m: any) => { const t = texts[m.kind] ?? m.text; const flagged = bad(t); const over = m.limit && t.length > m.limit; return (
         <Card key={m.kind} className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">{m.kind}</h3><span className={cx("font-mono text-xs", over ? "text-red-800" : "text-gray-500")}>{t.length}{m.limit ? `/${m.limit}` : ""}</span></div>
-          <Textarea id={`msg-${m.kind}`} rows={Math.max(3, Math.ceil(t.length / 90))} value={t} onChange={(e) => setTexts({ ...texts, [m.kind]: e.target.value })} />
+          <Textarea id={`msg-${m.kind}`} aria-label={`${m.kind} text`} rows={Math.max(3, Math.ceil(t.length / 90))} value={t} onChange={(e) => setTexts({ ...texts, [m.kind]: e.target.value })} />
           {flagged.length > 0 && <div role="alert" className="rounded border border-red-300 bg-red-50 p-2 text-sm text-red-800"><b>POTENTIAL HALLUCINATION:</b> {flagged.map((f) => `“${f.text}” — ${f.reasons.join(" ")}`).join(" | ")}</div>}
           <Button size="sm" variant="outline" disabled={flagged.length > 0 || !!over} onClick={() => copy(t, say)}>Copy</Button>
         </Card>); })}
@@ -606,19 +679,59 @@ function AnalyticsView({ apps, open }: { apps: AppRecord[]; open: (id: string) =
   );
 }
 
+
+const W_LABEL: Record<string, string> = { mandatoryTechnical: "Mandatory technical requirements", coreDomain: "Core verification / domain fit", seniority: "Role / seniority alignment", architecture: "Architecture / ownership", leadership: "Leadership", preferred: "Preferred skills", tools: "Tool alignment", educationOther: "Education / other" };
+function WeightsCard({ prefs, setPrefs }: { prefs: Prefs; setPrefs: (f: (p: Prefs) => Prefs) => void }) {
+  const cur: Record<string, number> = { ...DEFAULT_WEIGHTS, ...(prefs.weights ?? {}) };
+  const total = Object.values(cur).reduce((a, b) => a + b, 0);
+  return (
+    <Card className="space-y-2"><div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Match score weights</h3><Button size="sm" variant="ghost" onClick={() => setPrefs((p) => ({ ...p, weights: undefined }))}>Reset to default</Button></div>
+      <p className="text-sm text-gray-600">Applies to new analyses. Weights are normalised, so they only need to be in proportion (currently sum to {Math.round(total * 100)}%). Categories a job does not mention are dropped.</p>
+      <div className="grid gap-x-6 gap-y-2 md:grid-cols-2">{Object.keys(DEFAULT_WEIGHTS).map((k) => <div key={k}><Label htmlFor={`w-${k}`}>{W_LABEL[k]}: {Math.round(cur[k] * 100)}%</Label><input id={`w-${k}`} type="range" min={0} max={60} value={Math.round(cur[k] * 100)} className="w-full" onChange={(e) => setPrefs((p) => ({ ...p, weights: { ...cur, [k]: Number(e.target.value) / 100 } }))} /></div>)}</div></Card>
+  );
+}
+
+function VocabCard({ prefs, setPrefs, say }: { prefs: Prefs; setPrefs: (f: (p: Prefs) => Prefs) => void; say: any }) {
+  const [f, setF] = useState({ canonical: "", aliases: "", category: "Verification", type: "methodology", parent: "", related: "" });
+  const set = (k: string) => (e: React.ChangeEvent<any>) => setF({ ...f, [k]: e.target.value });
+  const names = useMemo(() => ontology.entries.map((e) => e.canonical).sort(), [prefs.vocab]);
+  const types = ["language", "methodology", "protocol", "processor", "domain", "simulator", "formal-tool", "scripting", "debugging", "planning", "coverage", "assertion", "leadership", "architecture", "management", "communication", "customer", "tool"];
+  const add = () => {
+    const canonical = f.canonical.trim();
+    if (!canonical) return say("err", "Give the term a name.");
+    const aliases = f.aliases.split(",").map((x) => x.trim()).filter(Boolean);
+    if (ontology.get(canonical)) return say("err", `"${canonical}" already exists in the vocabulary.`);
+    const clash = [canonical, ...aliases].map((a) => ontology.findTerms(a).map((h) => h.canonical)).flat();
+    if (clash.length) return say("err", `Already covered by: ${[...new Set(clash)].join(", ")}. Aliases must not duplicate existing terms.`);
+    const entry: VocabEntry = { canonical, aliases, category: f.category, type: f.type as VocabEntry["type"], ...(f.parent ? { parent: f.parent } : {}), ...(f.related.trim() ? { related: f.related.split(",").map((x) => x.trim()).filter((x) => ontology.get(x)) } : {}) };
+    setPrefs((p) => ({ ...p, vocab: [...p.vocab, entry] })); setF({ ...f, canonical: "", aliases: "", parent: "", related: "" }); say("ok", `Added "${canonical}". It applies to new analyses and parses.`);
+  };
+  return (
+    <Card className="space-y-3"><h3 className="text-sm font-semibold">Custom vocabulary <span className="font-normal text-gray-500">· {ontology.entries.length} terms ({prefs.vocab.length} yours)</span></h3>
+      <p className="text-sm text-gray-600">Add tools, protocols or phrasing the built-in ontology does not know. The built-in list is not editable here and cannot be overridden. Terms you add count as real skills when they appear in your profile, so only add what you mean.</p>
+      <div className="grid gap-3 md:grid-cols-3"><div><Label htmlFor="v-c">Term</Label><Input id="v-c" value={f.canonical} onChange={set("canonical")} /></div><div className="md:col-span-2"><Label htmlFor="v-a">Aliases (comma separated)</Label><Input id="v-a" value={f.aliases} onChange={set("aliases")} /></div>
+        <div><Label htmlFor="v-t">Type</Label><Select id="v-t" value={f.type} onChange={set("type")}>{types.map((t) => <option key={t}>{t}</option>)}</Select></div><div><Label htmlFor="v-p">Parent (implies this broader term)</Label><Select id="v-p" value={f.parent} onChange={set("parent")}><option value="">none</option>{names.map((n) => <option key={n}>{n}</option>)}</Select></div><div><Label htmlFor="v-r">Related terms (comma separated)</Label><Input id="v-r" value={f.related} onChange={set("related")} /></div></div>
+      <Button variant="outline" onClick={add}>Add term</Button>
+      {prefs.vocab.length > 0 && <ul className="divide-y divide-line rounded-md border border-line text-sm">{prefs.vocab.map((v) => <li key={v.canonical} className="flex items-center justify-between gap-2 p-2"><span><b>{v.canonical}</b> <span className="text-gray-500">{v.aliases.join(", ")} · {v.type}{v.parent ? ` · implies ${v.parent}` : ""}</span></span><button className="text-xs text-red-800 underline" onClick={() => setPrefs((p) => ({ ...p, vocab: p.vocab.filter((x) => x.canonical !== v.canonical) }))}>Remove</button></li>)}</ul>}
+    </Card>
+  );
+}
+
 /* ---------- Settings ---------- */
-function SettingsView({ store, setStore, downloads, say, claudeOn }: any) {
+function SettingsView({ store, setStore, setPrefs, downloads, say, claudeOn }: any) {
   const file = useRef<HTMLInputElement>(null);
   const [confirm, setConfirm] = useState(false);
   return (
     <div className="max-w-2xl space-y-4">
       <Card className="space-y-2 text-sm"><h3 className="font-semibold">Where your data lives</h3><p>Profile, resume text and applications are stored in <b>this browser only</b> (local storage for this artifact). They are not sent anywhere unless you switch on “Use Claude”, which sends the relevant text to Claude on your own account. Clearing site data or using another device starts empty, so keep a backup.</p><p>AI: <Badge tone={claudeOn ? "green" : "amber"}>{claudeOn ? "Claude available" : "offline engine only"}</Badge></p></Card>
+      <WeightsCard prefs={store.prefs} setPrefs={setPrefs} />
+      <VocabCard prefs={store.prefs} setPrefs={setPrefs} say={say} />
       <Card className="space-y-3"><h3 className="text-sm font-semibold">Backup</h3>
         <div className="flex flex-wrap gap-2"><Button variant="outline" disabled={!downloads} onClick={() => save(downloads, "career-optimizer-backup.json", JSON.stringify(store, null, 1) as any, say)}>Export backup (JSON)</Button>
-          <input ref={file} id="restore" type="file" accept=".json" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; try { const s = JSON.parse(await f.text()); setStore({ profile: s.profile ? ProfileSchema.parse(s.profile) : null, apps: Array.isArray(s.apps) ? s.apps : [], resumes: Array.isArray(s.resumes) ? s.resumes.map((r: Resume) => ({ ...r, profile: ProfileSchema.parse(r.profile) })) : [] }); say("ok", "Backup restored."); } catch { say("err", "That file is not a valid backup."); } e.target.value = ""; }} />
+          <input ref={file} id="restore" type="file" accept=".json" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; try { const s = JSON.parse(await f.text()); setStore({ prefs: { ...DEFAULT_PREFS, ...(s.prefs ?? {}) }, profile: s.profile ? ProfileSchema.parse(s.profile) : null, apps: Array.isArray(s.apps) ? s.apps : [], resumes: Array.isArray(s.resumes) ? s.resumes.map((r: Resume) => ({ ...r, profile: ProfileSchema.parse(r.profile) })) : [] }); say("ok", "Backup restored."); } catch { say("err", "That file is not a valid backup."); } e.target.value = ""; }} />
           <Button variant="outline" onClick={() => file.current?.click()}>Restore backup</Button></div></Card>
       <Card className="space-y-3"><h3 className="text-sm font-semibold text-red-700">Delete data</h3><p className="text-sm text-gray-600">Removes your profile, uploaded resumes and every application from this browser.</p>
-        {confirm ? <div className="flex gap-2"><Button variant="danger" onClick={() => { setStore({ profile: null, apps: [], resumes: [] }); try { localStorage.removeItem(KEY); } catch { /* ignore */ } setConfirm(false); say("ok", "All data deleted."); }}>Yes, delete everything</Button><Button variant="ghost" onClick={() => setConfirm(false)}>Cancel</Button></div> : <Button variant="danger" onClick={() => setConfirm(true)}>Delete all my data</Button>}</Card>
+        {confirm ? <div className="flex gap-2"><Button variant="danger" onClick={() => { setStore({ profile: null, apps: [], resumes: [], prefs: DEFAULT_PREFS }); ontology.setCustom([]); try { localStorage.removeItem(KEY); } catch { /* ignore */ } setConfirm(false); say("ok", "All data deleted."); }}>Yes, delete everything</Button><Button variant="ghost" onClick={() => setConfirm(false)}>Cancel</Button></div> : <Button variant="danger" onClick={() => setConfirm(true)}>Delete all my data</Button>}</Card>
     </div>
   );
 }

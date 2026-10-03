@@ -17,6 +17,7 @@ export interface LinkedInPlan {
   skippedHeadlines: { kind: string; why: string }[];
   about: { text: string; removed: ClaimCheck[] };
   skills: string[];
+  featured: { item: string; why: string }[];
   experience: { roleLabel: string; lead: string[]; weak: string[] }[];
   missingKeywords: { keyword: string; why: string }[];
   notes: string[];
@@ -50,19 +51,19 @@ export function planLinkedIn(profile: Profile, jd: ParsedJD, match: MatchResult,
   const langs = ["SystemVerilog", "UVM"].filter((t) => idx.terms.has(t));
   const proc = ["RISC-V", "ARM"].filter((t) => idx.terms.has(t)).slice(0, 2);
   const extras = ["Automotive", "Functional Safety", "Gate-Level Simulation", "PCIe", "SerDes"].filter((t) => idx.terms.has(t)).map(show);
-  const arch = idx.terms.has("Testbench Architecture") || profile.roles.some((r) => r.architectureOwnership);
-  const dom = f.domain.replace(/ verification$/, "").replace(/^design$/, "Design");
+  const arch = idx.terms.has("Testbench Architecture"); // only when the profile actually evidences architecture work
+  const dom = f.domain === "verification" ? "" : f.domain.replace(/ verification$/, "");
   const heads: [string, string[], string?][] = [
-    ["Recruiter-search optimised", [f.title, `${dom} Verification`, langs.join("/"), ...proc, ...extras.slice(0, 3), arch ? "Verification Architecture" : ""]],
-    ["Principal / seniority-led", [f.title, f.years ? `${f.years}+ years` : "", `${dom} Verification`, langs.join("/"), ...proc, ...tools]],
+    ["Recruiter-search optimised", [f.title, dom ? `${dom} Verification` : "", langs.join("/"), ...proc, ...extras.slice(0, 3), arch ? "Verification Architecture" : ""]],
+    ["Principal / seniority-led", [f.title, f.years ? `${f.years}+ years` : "", dom ? `${dom} Verification` : "", langs.join("/"), ...proc, ...tools]],
   ];
   const skippedHeadlines: LinkedInPlan["skippedHeadlines"] = [];
   if (arch) heads.push(["Architect-focused", [f.title, "Verification Architecture & Methodology", langs.join("/"), idx.terms.has("Functional Coverage") ? "Coverage Strategy" : "", ...proc.slice(0, 1), idx.terms.has("Verification Planning") ? "Verification Planning" : ""]]);
   else skippedHeadlines.push({ kind: "Architect-focused", why: "No architecture-ownership evidence in your profile." });
   const contract = hasContract(profile);
-  if (contract) heads.push(["Consulting-focused", [contract.title || "Design Verification Consultant", `${dom} Verification`, langs.join("/"), ...proc, ...extras.slice(0, 2)]]);
+  if (contract) heads.push(["Consulting-focused", [contract.title || "Design Verification Consultant", dom ? `${dom} Verification` : "", langs.join("/"), ...proc, ...extras.slice(0, 2)]]);
   else skippedHeadlines.push({ kind: "Consulting-focused", why: "No contract, freelance or consulting role in your profile." });
-  if (idx.terms.has("AI for Verification")) heads.push(["AI + verification", [f.title, "AI-assisted Verification", `${dom} Verification`, langs.join("/")]]);
+  if (idx.terms.has("AI for Verification")) heads.push(["AI + verification", [f.title, "AI-assisted Verification", dom ? `${dom} Verification` : "", langs.join("/")]]);
   else skippedHeadlines.push({ kind: "AI + verification", why: "No AI/ML evidence in your profile." });
 
   const headlines: HeadlineVariant[] = heads.map(([kind, parts]) => {
@@ -103,6 +104,13 @@ export function planLinkedIn(profile: Profile, jd: ParsedJD, match: MatchResult,
     return { roleLabel: [r.title, r.employer].filter(Boolean).join(" @ "), lead: ranked.slice(0, 3).map((x) => x.b), weak: bs.filter((b) => ["Weak", "Generic"].includes(classifyBullet(b).cls)) };
   });
 
+  const featured: LinkedInPlan["featured"] = [
+    ...profile.projects.slice(0, 3).map((p) => ({ item: p.name || "Project", why: "A short write-up or slide for this project (the Presentation tab builds a projects deck you can upload)." })),
+    ...profile.publications.slice(0, 2).map((p) => ({ item: p, why: "Publications and patents belong in Featured with a link." })),
+    ...(profile.identity.github ? [{ item: profile.identity.github, why: "Link your public repositories if they show verification work you can discuss." }] : []),
+    ...profile.certifications.slice(0, 2).map((c) => ({ item: c, why: "Certifications recruiters search for." })),
+  ];
+  if (!featured.length) featured.push({ item: "Nothing to feature yet", why: "Add projects, publications or certifications to your profile and they will be suggested here." });
   const missingKeywords = match.keywordAnalysis.filter((k) => k.suggestion).map((k) => ({ keyword: show(k.term), why: k.why ?? "" }));
   const notes: string[] = [];
   if (headlines[0] && headlines[0].length > HEADLINE_LIMIT) notes.push("Headline exceeds LinkedIn's limit.");
@@ -117,5 +125,5 @@ export function planLinkedIn(profile: Profile, jd: ParsedJD, match: MatchResult,
     const scan = (t: string) => { const found = new Set(ontology.findTerms(t).map((h) => show(h.canonical))); return { present: keys.filter((k) => found.has(k)), missing: keys.filter((k) => !found.has(k)).slice(0, 10) }; };
     cur = { headline: current.headline ? { length: current.headline.length, ...scan(current.headline) } : undefined, about: current.about ? scan(current.about) : undefined };
   }
-  return { keywordCoverage, titleKeywords, headlines, skippedHeadlines, about: { text: aboutText, removed }, skills, experience, missingKeywords, notes, current: cur };
+  return { keywordCoverage, titleKeywords, headlines, skippedHeadlines, about: { text: aboutText, removed }, skills, featured, experience, missingKeywords, notes, current: cur };
 }

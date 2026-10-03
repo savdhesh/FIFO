@@ -28,7 +28,7 @@ describe("in-Claude artifact (keyless) flow", () => {
     let a = await analyze(profile, prov, { jdText: DEMO_JD_TEXT, jobUrl: "", company: "", title: "", settings: SettingsSchema.parse({}) });
     a = acceptAllSafe(await generate(profile, prov, a));
     const doc = finalDocs(a, profile);
-    const pdf = Buffer.from(resumePdf(doc.resume, "3"));
+    const pdf = Buffer.from(resumePdf(doc.resume, "3").data);
     const text = await extractText("pdf", pdf);
     expect(text.trim().startsWith("Alex Demo")).toBe(true);
     expect(text).toMatch(/PROFESSIONAL EXPERIENCE/);

@@ -2,6 +2,7 @@ import PDFDocument from "pdfkit";
 import type { MatchResult, ParsedJD, TailoredResume } from "../types";
 import type { CoverLetter } from "../tailoring/cover-letter";
 import type { TruthAudit } from "../truth/truth";
+import { themeById } from "./themes";
 
 const INK = "#111111", MUTED = "#444444";
 
@@ -20,7 +21,8 @@ function render(build: (d: PDFKit.PDFDocument) => void, meta: { title: string; a
 const contactLine = (id: TailoredResume["identity"]) => [id.location, id.email, id.phone, id.linkedin, id.github, id.portfolio].filter(Boolean).join("  |  ");
 
 /** ATS-safe: single column, standard font, real text, no tables/images/icons. */
-export function resumePdf(r: TailoredResume, density: "1" | "2" | "3" | "4" | "cv" = "3"): Promise<Buffer> {
+export function resumePdf(r: TailoredResume, density: "1" | "2" | "3" | "4" | "cv" = "3", themeId?: string): Promise<Buffer> {
+  const th = themeById(themeId);
   const base = density === "1" ? 9.5 : density === "2" ? 10 : 10.5;
   return render((d) => {
     const w = d.page.width - d.page.margins.left - d.page.margins.right;
@@ -28,8 +30,9 @@ export function resumePdf(r: TailoredResume, density: "1" | "2" | "3" | "4" | "c
     d.font("Helvetica").fontSize(base - 0.5).fillColor(MUTED).text(contactLine(r.identity), { width: w });
     if (r.headline) { d.moveDown(0.5).font("Helvetica-Bold").fontSize(base + 0.5).fillColor(INK).text(r.headline, { width: w }); }
     const section = (title: string) => {
-      d.moveDown(0.8).font("Helvetica-Bold").fontSize(base + 0.5).fillColor(INK).text(title.toUpperCase(), { width: w });
-      const y = d.y + 1; d.moveTo(d.page.margins.left, y).lineTo(d.page.margins.left + w, y).lineWidth(0.5).strokeColor("#999999").stroke(); d.moveDown(0.3);
+      d.moveDown(0.8).font("Helvetica-Bold").fontSize(base + 0.5).fillColor(`#${th.heading}`).text(title.toUpperCase(), { width: w });
+      if (th.rule) { const y = d.y + 1; d.moveTo(d.page.margins.left, y).lineTo(d.page.margins.left + w, y).lineWidth(0.5).strokeColor("#999999").stroke(); }
+      d.moveDown(0.3);
     };
     const para = (t: string) => d.font("Helvetica").fontSize(base).fillColor(INK).text(t, { width: w, lineGap: 1.5 });
     const bullet = (t: string) => {
@@ -58,6 +61,7 @@ export function resumePdf(r: TailoredResume, density: "1" | "2" | "3" | "4" | "c
         for (const b of e.bullets) bullet(b.text);
       }
     }
+    if ((r.projects ?? []).length) { section("Major Technical Projects"); for (const p of r.projects) { d.moveDown(0.3).font("Helvetica-Bold").fontSize(base + 0.5).fillColor(INK).text(p.name + (p.sub ? `  (${p.sub})` : ""), { width: w }); d.moveDown(0.2); for (const b of p.bullets) bullet(b); } }
     if (r.education.length) { section("Education"); for (const e of r.education) para(e); }
     if (r.certifications.length) { section("Certifications"); for (const c of r.certifications) bullet(c); }
     if (r.publications.length) { section("Publications"); for (const c of r.publications) bullet(c); }

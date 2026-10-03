@@ -17,12 +17,25 @@ export interface TermHit { canonical: string; surface: string; index: number; co
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export class Ontology {
-  readonly entries: VocabEntry[];
+  readonly entries!: VocabEntry[];
   private byCanonical = new Map<string, VocabEntry>();
   private matchers: { entry: VocabEntry; alias: string; re: RegExp; len: number }[] = [];
 
+  private base: VocabEntry[];
   constructor(entries: VocabEntry[] = vocabulary as VocabEntry[]) {
-    this.entries = entries;
+    this.base = entries;
+    this.entries = [];
+    this.rebuild([]);
+  }
+
+  /** Replace the user-defined vocabulary (additions to the built-in list; built-in canonicals cannot be overridden). */
+  setCustom(custom: VocabEntry[]) { this.rebuild(custom); }
+
+  private rebuild(custom: VocabEntry[]) {
+    const have = new Set(this.base.map((e) => e.canonical.toLowerCase()));
+    const entries = [...this.base, ...custom.filter((c) => c.canonical && !have.has(c.canonical.toLowerCase()))];
+    (this as { entries: VocabEntry[] }).entries = entries;
+    this.byCanonical.clear(); this.matchers = [];
     for (const e of entries) this.byCanonical.set(e.canonical.toLowerCase(), e);
     for (const e of entries) {
       for (const alias of new Set([e.canonical, ...e.aliases])) {

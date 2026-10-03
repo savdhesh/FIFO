@@ -183,6 +183,7 @@ export interface TailoredResume {
   skills: { label: string; items: string[] }[];
   experience: { roleId: string; title: string; employer: string; location: string; dates: string; bullets: { text: string; changeId?: string }[] }[];
   education: string[];
+  projects: { name: string; sub: string; bullets: string[] }[];
   certifications: string[];
   publications: string[];
   identity: Profile["identity"];
@@ -193,5 +194,6 @@ export const SettingsSchema = z.object({
   country: z.string().default("USA"),
   seniority: z.enum(["Engineer", "Senior", "Staff", "Principal", "Architect", "Lead", "Manager"]).default("Principal"),
   length: z.enum(["1", "2", "3", "4", "cv"]).default("3"),
+  weights: z.record(z.number().min(0).max(1)).optional(), // overrides DEFAULT_WEIGHTS keys (see matching/matcher.ts)
 });
 export type Settings = z.infer<typeof SettingsSchema>;

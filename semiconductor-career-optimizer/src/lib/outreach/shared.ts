@@ -26,7 +26,7 @@ export function gatherFacts(profile: Profile, jd: ParsedJD, match: MatchResult):
   if (have("IP Verification")) parts.push("IP");
   if (have("CPU Verification")) parts.push("CPU");
   const joined = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} & ${parts[parts.length - 1]}` : parts[0];
-  const domain = parts.length ? `${joined} verification` : "design verification";
+  const domain = parts.length ? `${joined} verification` : "verification";
   return {
     idx, years: Math.floor(idx.years), latest, title: latest?.title || "Verification Engineer", employer: latest?.employer ?? "",
     jdTerms: matchedJdTerms(jd, match).map((m) => m.term), domain, company: jd.company, role: jd.roleTitle,

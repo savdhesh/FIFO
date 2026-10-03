@@ -52,7 +52,7 @@ function domainPhrase(idx: ProfileIndex): string {
   const order = ["SoC Verification", "IP Verification", "CPU Verification", "Subsystem Integration", "Design Verification"];
   const have = order.filter((t) => idx.terms.has(t));
   const names = have.map((t) => (t === "Subsystem Integration" ? "subsystem" : t.replace(" Verification", "")));
-  if (!have.length) return "design verification";
+  if (!have.length) return "verification";
   const uniq = [...new Set(names)].slice(0, 3);
   return uniq.length === 1 && uniq[0] === "Design" ? "design verification" : `${uniq.filter((n) => n !== "Design").join(", ").replace(/, ([^,]*)$/, " and $1")} verification`;
 }
@@ -133,10 +133,14 @@ export function tailorResume(
     return { roleId: role.id, title: role.title, employer: role.employer, location: role.location, dates: formatRange(role.startDate, role.endDate, style.dates), bullets };
   });
 
+  // Major technical projects: your own listed projects, verbatim, for longer resumes only.
+  const PROJECT_LIMIT: Record<Settings["length"], number> = { "1": 0, "2": 0, "3": 2, "4": 4, cv: 99 };
+  const projRank = profile.projects.map((p) => ({ p, s: [p.summary, ...p.highlights].reduce((a, b) => a + bulletRelevance(b, jdWeights), 0) })).sort((a, b) => b.s - a.s);
+  const projects = projRank.slice(0, PROJECT_LIMIT[settings.length]).map(({ p }) => ({ name: p.name || "Project", sub: [p.employer, p.period].filter(Boolean).join(" · "), bullets: [p.summary, ...p.highlights].filter(Boolean).slice(0, settings.length === "cv" ? 8 : 4) }));
   const tailored: TailoredResume = {
     headline, summary, competencies, skills, experience,
     education: profile.education.map((e) => [e.degree, e.specialization && !e.degree.toLowerCase().includes(e.specialization.toLowerCase()) ? e.specialization : "", e.university, e.year].filter(Boolean).join(", ")),
-    certifications: profile.certifications, publications: profile.publications, identity: profile.identity,
+    projects, certifications: profile.certifications, publications: profile.publications, identity: profile.identity,
   };
   void headlineId; void summaryId; void compId;
   return { tailored, changes };
@@ -167,6 +171,7 @@ export function applyDecisions(t: TailoredResume, changes: ChangeProposal[], pro
         return { text: applied(c) ? text(c) : c.original };
       }),
     })),
+    projects: t.projects ?? [],
     identity: profile.identity,
   };
 }

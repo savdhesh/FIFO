@@ -1,17 +1,19 @@
 import { AlignmentType, BorderStyle, Document, LevelFormat, Packer, Paragraph, TextRun } from "docx";
 import type { TailoredResume } from "../types";
+import { themeById } from "./themes";
 import type { CoverLetter } from "../tailoring/cover-letter";
 
-const FONT = "Calibri";
+let FONT = "Calibri";
 const run = (text: string, o: { bold?: boolean; italics?: boolean; size?: number; color?: string } = {}) => new TextRun({ text, font: FONT, size: o.size ?? 21, bold: o.bold, italics: o.italics, color: o.color ?? "111111" });
 const contact = (id: TailoredResume["identity"]) => [id.location, id.email, id.phone, id.linkedin, id.github, id.portfolio].filter(Boolean).join("  |  ");
 
 const numbering = { config: [{ reference: "bullets", levels: [{ level: 0, format: LevelFormat.BULLET, text: "•", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 360, hanging: 240 } } } }] }] };
 
 /** Plain paragraphs only (no tables, text boxes, headers/footers) so ATS parsers read it in order. */
-export function resumeDoc(r: TailoredResume): Document {
+export function resumeDoc(r: TailoredResume, themeId?: string): Document {
+  const th = themeById(themeId); FONT = th.docxFont;
   const out: Paragraph[] = [];
-  const heading = (t: string) => out.push(new Paragraph({ spacing: { before: 200, after: 80 }, border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "999999", space: 1 } }, children: [run(t.toUpperCase(), { bold: true, size: 22 })] }));
+  const heading = (t: string) => out.push(new Paragraph({ spacing: { before: 200, after: 80 }, border: th.rule ? { bottom: { style: BorderStyle.SINGLE, size: 4, color: "999999", space: 1 } } : undefined, children: [run(t.toUpperCase(), { bold: true, size: 22, color: th.heading })] }));
   const para = (t: string) => out.push(new Paragraph({ spacing: { after: 60 }, children: [run(t)] }));
   const bullet = (t: string) => out.push(new Paragraph({ numbering: { reference: "bullets", level: 0 }, spacing: { after: 40 }, children: [run(t)] }));
   out.push(new Paragraph({ children: [run(r.identity.name || "Candidate", { bold: true, size: 36 })] }));
@@ -28,12 +30,16 @@ export function resumeDoc(r: TailoredResume): Document {
       for (const b of e.bullets) bullet(b.text);
     }
   }
+  if ((r.projects ?? []).length) {
+    heading("Major Technical Projects");
+    for (const p of r.projects) { out.push(new Paragraph({ spacing: { before: 100 }, keepNext: true, children: [run(p.name, { bold: true, size: 22 }), ...(p.sub ? [run(`  ${p.sub}`, { italics: true, size: 19, color: "444444" })] : [])] })); for (const b of p.bullets) bullet(b); }
+  }
   if (r.education.length) { heading("Education"); r.education.forEach(para); }
   if (r.certifications.length) { heading("Certifications"); r.certifications.forEach(bullet); }
   if (r.publications.length) { heading("Publications"); r.publications.forEach(bullet); }
   return new Document({ creator: r.identity.name, title: `${r.identity.name} Resume`, numbering, sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 850, bottom: 850, left: 1000, right: 1000 } } }, children: out }] });
 }
-export const resumeDocx = (r: TailoredResume): Promise<Buffer> => Packer.toBuffer(resumeDoc(r));
+export const resumeDocx = (r: TailoredResume, themeId?: string): Promise<Buffer> => Packer.toBuffer(resumeDoc(r, themeId));
 
 export function coverLetterDoc(l: CoverLetter, identity: TailoredResume["identity"]): Document {
   const out: Paragraph[] = [

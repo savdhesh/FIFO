@@ -101,7 +101,7 @@ function splitHeader(parts: string[]) {
 
 const ACHIEVEMENT_RE = /(\d+\s?%|\b\d+(?:\.\d+)?\s?x\b|\b(?:reduced|improved|achieved|delivered|saved|increased|accelerated|cut)\b)/i;
 const LEAD_RE = /\b(led|lead|leading|managed|mentor(?:ed|ing)?|supervis(?:ed|ing)|team of \d+|guided|coached)\b/i;
-const ARCH_RE = /\b(architect(?:ed|ure)?|defined|methodology|framework|reusable|infrastructure|strategy)\b/i;
+const ARCH_RE = /\b(architect(?:ed|ure)?|methodology|framework|reusable)\b/i;
 const CUST_RE = /\b(customers?|clients?|customer-facing|stakeholders?)\b/i;
 
 function categorize(text: string, role: Pick<Role, "technologies" | "tools" | "protocols" | "methodologies">) {
@@ -163,7 +163,7 @@ function parseRoles(lines: string[]): Role[] {
     categorize(all, role);
     role.leadership = items.find((i) => LEAD_RE.test(i)) ?? "";
     role.teamSize = all.match(/team of (\d+)/i)?.[0] ?? "";
-    role.architectureOwnership = items.find((i) => ARCH_RE.test(i) && /architect|methodology|framework|strategy|reusable/i.test(i)) ?? "";
+    role.architectureOwnership = items.find((i) => ARCH_RE.test(i)) ?? "";
     role.technicalOwnership = items.find((i) => /\b(owned|ownership|responsible for|end-to-end)\b/i.test(i)) ?? "";
     role.customerFacing = items.find((i) => CUST_RE.test(i)) ?? "";
     roles.push(role); prev = role;

@@ -59,7 +59,7 @@ export function checkClaim(text: string, ctx: TruthContext): ClaimCheck {
       continue;
     }
     const type = ontology.get(term)?.type ?? "other";
-    if (rel.type === "weak" && PRESENTATION_TYPES.has(type)) {
+    if ((rel.type === "weak" || rel.type === "related") && PRESENTATION_TYPES.has(type)) {
       inferred = true; reasons.push(`"${term}" is plausible from ${rel.via} but not stated — needs your confirmation.`);
     } else {
       unsupported = true; unknownTerms.push(term);
@@ -157,5 +157,6 @@ export function auditResume(r: TailoredResume, profile: Profile, allowedNames: s
   for (const c of r.competencies) checks.push(checkClaim(c, { index, allowedNames }));
   for (const s of r.skills) for (const i of s.items) checks.push(checkClaim(i, { index, allowedNames }));
   for (const e of r.experience) for (const b of e.bullets) checks.push(checkClaim(b.text, { index, roleId: e.roleId, allowedNames }));
+  for (const p of r.projects ?? []) for (const b of p.bullets) checks.push(checkClaim(b, { index, allowedNames }));
   return summarizeChecks(checks);
 }

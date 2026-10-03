@@ -16,6 +16,7 @@ export interface AppRecord {
   settings: Settings; jd: ParsedJD; match: MatchResult;
   tailored: TailoredResume | null; changes: ChangeProposal[]; letter: CoverLetter | null;
   status: string; notes: string; recruiterName: string; recruiterContact: string; appliedAt: string;
+  packVersion?: number; packAt?: string; theme?: string;
   linkedin?: LinkedInPlan | null; outreach?: OutreachPack | null; interview?: InterviewPlan | null; prepDone?: Record<string, boolean>; history?: { status: string; at: string }[];
 }
 
@@ -40,7 +41,7 @@ export async function generate(profile: Profile, p: AIProvider, a: AppRecord): P
   const rewrites = await p.rewriteResume(profile, a.jd, a.match);
   const { tailored, changes } = tailorResume(profile, a.jd, a.match, a.settings, rewrites);
   const letter = await p.generateCoverLetter(profile, a.jd, a.match, a.settings);
-  return { ...a, tailored, changes, letter };
+  return { ...a, tailored, changes, letter, packVersion: (a.packVersion ?? 0) + 1, packAt: new Date().toISOString() };
 }
 
 const order = ["VERIFIED", "SUPPORTED", "INFERRED", "UNSUPPORTED"] as const;

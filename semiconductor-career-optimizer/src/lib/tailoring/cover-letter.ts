@@ -39,7 +39,7 @@ export function generateCoverLetter(profile: Profile, jd: ParsedJD, match: Match
   // P1: role + positioning
   const p1 = [
     `I am applying for the ${role} position${company ? ` at ${company}` : ""}.`,
-    `${years ? `I bring ${years}+ years of` : "I bring"} verification experience${latest?.title ? `, most recently as ${latest.title}${latest.employer ? ` at ${latest.employer}` : ""}` : ""}, with hands-on work in ${list(techTerms.length ? techTerms : ["design verification"])}.`,
+    `${years ? `I bring ${years}+ years of` : "I bring"} verification experience${latest?.title ? `, most recently as ${latest.title}${latest.employer ? ` at ${latest.employer}` : ""}` : ""}, with hands-on work in ${list(techTerms.length ? techTerms : ["verification"])}.`,
   ].join(" ");
 
   // P2/P3: strongest direct evidence — distinct bullets that evidence mandatory/implied requirements.
@@ -64,7 +64,7 @@ export function generateCoverLetter(profile: Profile, jd: ParsedJD, match: Match
   for (let i = 0; i < nTech; i++) { const f = pickFp(); if (f) tech.push(f); }
   const buildP2 = () => tech.length
     ? `The closest overlap with your requirements is hands-on verification work. ${tech.map((s, i) => `${i >= 2 ? s.replace(/^I /, "I also ") : s}.`).join(" ")}`
-    : `My background aligns with the posting on ${list(techTerms.slice(0, 3)) || "design verification"}.`;
+    : `My background aligns with the posting on ${list(techTerms.slice(0, 3)) || "verification"}.`;
   let p2 = buildP2();
   const p3parts = [archFp, leadFp].filter(Boolean) as string[];
   const p3 = p3parts.length ? `Beyond block-level work, the scope has grown toward ownership. ${p3parts.map((s) => `${s}.`).join(" ")}` : "";

@@ -14,16 +14,12 @@ Copy bullets verbatim into responsibilities/achievements. Leave unknown fields a
   jdParser: `${RULES}
 Task: parse the job description. Return {roleTitle,company,location,seniority(Engineer|Senior|Staff|Principal|Architect|Lead|Manager|Unspecified),yearsRequired,education,workAuthorization,requirements[{id,text,importance(mandatory|preferred|implied|boilerplate|administrative),type,context}],leadershipExpectations[],architectureExpectations[],domainExpectations[]}.
 Do not weight every sentence equally; mark benefits/EEO text as boilerplate.`,
-  matchAnalysis: `${RULES}
-Task: for each JD requirement decide exact | equivalent | related | weak | missing against the profile, citing the evidence bullet. Never upgrade related to exact.`,
   resumeRewrite: `${RULES}
 Task: propose rewrites of weak or generic bullets. Pattern: Action + Technical Scope + Ownership + Result. Use ONLY facts present in the same role. Do not add metrics unless present in the source. Return {rewrites:[{roleId,original,proposed,reason}]}.`,
   coverLetter: `${RULES}
 Task: write a 250-400 word cover letter in 4 paragraphs: role+positioning, most relevant technical evidence, architecture/leadership evidence, why this role + close. Avoid clichés ("passionate", "perfect fit", "I am writing to express"). Only claim what the profile supports. Return {paragraphs:[string]}.`,
   truthAudit: `${RULES}
 Task: classify each claim as VERIFIED | SUPPORTED | INFERRED | UNSUPPORTED against the profile. Return {checks:[{text,status,reasons[]}]}.`,
-  seniorityAudit: `${RULES}
-Task: identify weak bullets and seniority signals without inflating the candidate's level.`,
   interview: `${RULES}\nTask: for each interview question write a short answer OUTLINE (3-5 sentences) that tells the candidate how to structure an honest answer using ONLY the supplied evidence. If stance is gap or related, the outline must say so plainly and bridge to real related work; never imply direct experience. Return {outlines:[{id,outline}]}.`,
   linkedin: `${RULES}\nTask: rewrite the LinkedIn About draft for recruiter discoverability. Do not copy resume bullets; lead with scope and keywords in the first 300 characters. Use only facts in the profile; no metrics, titles or tools that are absent. Return {about: string} (max 2600 chars, plain text, short paragraphs).`,
   recruiterMessage: `${RULES}\nTask: polish the outreach drafts. Keep each concise, keep bracketed placeholders like [Name] untouched, never invent names, mutual contacts, shared history or knowledge of the company beyond the posting. Connection request must stay within 300 characters. Return {messages:[{kind,text}]} using the same kinds.`,

@@ -120,7 +120,8 @@ function whyLines(ms: RequirementMatch[], max = 4): string[] {
   return [...hits, ...miss];
 }
 
-export function analyzeMatch(profile: Profile, jd: ParsedJD, settings?: Partial<Settings>, weights: ScoreWeights = DEFAULT_WEIGHTS): MatchResult {
+export function analyzeMatch(profile: Profile, jd: ParsedJD, settings?: Partial<Settings>, weightsArg?: ScoreWeights): MatchResult {
+  const weights: ScoreWeights = weightsArg ?? { ...DEFAULT_WEIGHTS, ...(settings?.weights as Partial<ScoreWeights> | undefined) };
   const idx = buildIndex(profile);
   const reqMap = new Map(jd.requirements.map((r) => [r.id, r]));
   const rows: RequirementMatch[] = [];

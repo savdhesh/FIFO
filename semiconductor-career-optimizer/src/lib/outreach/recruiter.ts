@@ -17,7 +17,7 @@ export function capabilityPhrases(f: Facts): string[] {
   if (has("Formal Verification")) out.push("formal verification");
   if (has("Functional Safety")) out.push("functional safety");
   if (has("Debugging")) out.push("debug");
-  if (!out.length) return ["design verification"];
+  if (!out.length) return ["verification"];
   return out;
 }
 
