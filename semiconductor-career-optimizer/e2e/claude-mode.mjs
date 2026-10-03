@@ -1,0 +1,20 @@
+import { chromium } from "playwright-core"; import fs from "fs";
+const exe = fs.readdirSync("/opt/pw-browsers").filter(d=>d.startsWith("chromium-"))[0];
+const b = await chromium.launch({ executablePath: `${process.env.CHROMIUM ?? `/opt/pw-browsers/${exe}/chrome-linux/chrome`}`, args:["--no-sandbox"] });
+const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } }); await ctx.route(/fonts\./, r => r.abort());
+await ctx.addInitScript(() => {
+  window.__calls = 0; window.__saved = [];
+  const sample = async (input, opts) => { window.__calls++; opts?.onText?.({ text: "x", delta: "x" }); return { text: JSON.stringify({ identity: { name: "Alex Demo" }, roles: [] }), truncated: false }; };
+  window.claude = { use: async (n) => n === "sample" ? sample : n === "downloads" ? { save: async (r) => { window.__saved.push(r.filename); return { status: "saved" }; } } : null };
+});
+const page = await ctx.newPage(); const errs = []; page.on("pageerror", e => errs.push(e.message));
+await page.goto(`file://${process.cwd()}/dist/artifact.html`);
+await page.waitForFunction(() => !document.querySelector("#use-claude").disabled);
+console.log("toggle enabled with function-valued sample:", await page.isEnabled("#use-claude"));
+await page.check("#use-claude"); await page.setInputFiles("#resume-file", "tests/fixtures/demo-resume.txt"); await page.waitForSelector("#parse-review", { timeout: 20000 });
+console.log("sample calls:", await page.evaluate(() => window.__calls), "| source:", /built-in parser \(Claude/.test(await page.textContent("#parse-review")) ? "heuristic won over weaker Claude parse" : "other");
+await page.click("button:has-text('Analyze a job')"); await page.click("text=Use sample JD"); await page.click("button:has-text('Analyze match')"); await page.waitForSelector("text=Recommendation");
+await page.click("[role=tab]:has-text('Resume Changes')"); await page.click("button:has-text('Generate application pack')"); await page.waitForSelector("text=Accept all safe changes");
+await page.click("button:has-text('Accept all safe changes')"); await page.click("button:has-text('Download Resume (PDF)')"); await page.waitForTimeout(500);
+console.log("downloads.save called with:", await page.evaluate(() => window.__saved), "| errors:", errs);
+await b.close();

@@ -12,7 +12,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault(); setBusy(true); setErr("");
     const f = new FormData(e.currentTarget);
-    try { await api(`/api/auth/${mode}`, { method: "POST", json: Object.fromEntries(f) }); r.push("/"); r.refresh(); }
+    try { await api(`/api/auth/${mode}`, { method: "POST", json: Object.fromEntries(f) }); window.location.href = "/workspace/index.html"; }
     catch (x: any) { setErr(x.message); } finally { setBusy(false); }
   }
   return (

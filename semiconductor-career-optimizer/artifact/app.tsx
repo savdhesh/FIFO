@@ -26,19 +26,38 @@ import { buildIndex } from "../src/lib/profile-index";
 
 declare const claude: any;
 const KEY = "sco.v1";
-type Resume = { id: string; name: string; addedAt: string; profile: Profile; ats?: AtsReport | null; diag?: ParseDiagnostics | null; source?: string };
+
+/** Where state lives. Inside Claude it is this browser's local storage; the self-hosted app injects a server adapter (window.SCO_ADAPTER). */
+export interface Adapter {
+  mode: "local" | "server";
+  load(): Promise<any | null>;
+  save(state: unknown): void;
+  user?: { email: string };
+  logout?: () => Promise<void>;
+  fetchJob?: (url: string) => Promise<string>;
+  storeFile?: (file: File) => Promise<string>;
+  deleteFile?: (id: string) => Promise<void>;
+  deleteAll?: (password: string, scope: "data" | "account") => Promise<void>;
+  aiProvider?: string;
+}
+const localAdapter: Adapter = {
+  mode: "local",
+  async load() { try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch { return null; } },
+  save(state) { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* blocked or full: the page keeps working without persistence */ } },
+};
+const adapter: Adapter = (globalThis as any).SCO_ADAPTER ?? localAdapter;
+type Resume = { id: string; name: string; addedAt: string; profile: Profile; ats?: AtsReport | null; diag?: ParseDiagnostics | null; source?: string; fileId?: string };
 type Prefs = { weights?: Record<string, number>; theme: string; vocab: VocabEntry[] };
 type Store = { profile: Profile | null; apps: AppRecord[]; resumes: Resume[]; prefs: Prefs };
 const DEFAULT_PREFS: Prefs = { theme: "plain", vocab: [] };
-const load = (): Store => { try { const s = JSON.parse(localStorage.getItem(KEY) || ""); const prefs = { ...DEFAULT_PREFS, ...(s.prefs ?? {}) }; ontology.setCustom(prefs.vocab); return { profile: s.profile ? ProfileSchema.parse(s.profile) : null, apps: s.apps ?? [], resumes: (s.resumes ?? []).map((r: Resume) => ({ ...r, profile: ProfileSchema.parse(r.profile) })), prefs }; } catch { return { profile: null, apps: [], resumes: [], prefs: DEFAULT_PREFS }; } };
-let persistWarned = false;
-const persist = (s: Store) => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { if (!persistWarned) { persistWarned = true; } } };
+const hydrate = (s: any): Store => { try { if (!s) throw new Error("empty"); const prefs = { ...DEFAULT_PREFS, ...(s.prefs ?? {}) }; ontology.setCustom(prefs.vocab); return { profile: s.profile ? ProfileSchema.parse(s.profile) : null, apps: s.apps ?? [], resumes: (s.resumes ?? []).map((r: Resume) => ({ ...r, profile: ProfileSchema.parse(r.profile) })), prefs }; } catch { return { profile: null, apps: [], resumes: [], prefs: DEFAULT_PREFS }; } };
+
 
 const STATUSES = ["SAVED", "ANALYZED", "APPLYING", "APPLIED", "RECRUITER_CONTACTED", "SCREENING", "TECHNICAL_ROUND", "HIRING_MANAGER", "FINAL_ROUND", "OFFER", "REJECTED", "WITHDRAWN"];
 const errCopy = (e: any) => (e?.code === "not_granted" ? "Claude access was declined for this session." : e?.code === "rate_limited" ? "Too many requests. Wait a moment." : e?.code === "cancelled" ? "Cancelled." : e?.message || "Something went wrong.");
 
-function App() {
-  const [store, setStore] = useState<Store>(load);
+function App({ initial }: { initial: Store }) {
+  const [store, setStore] = useState<Store>(initial);
   const [view, setView] = useState<"profile" | "analyze" | "apps" | "versions" | "analytics" | "deck" | "settings">("profile");
   const [openId, setOpenId] = useState<string | null>(null);
   const [sample, setSample] = useState<any>(null);
@@ -48,14 +67,16 @@ function App() {
   const [toast, setToast] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
   const abort = useRef<AbortController | null>(null);
 
-  useEffect(() => { (async () => { try { setSample(await claude.use("sample")); setDownloads(await claude.use("downloads")); } catch { /* standalone */ } })(); }, []);
-  useEffect(() => { persist(store); }, [store]);
+  useEffect(() => { (async () => { try { { const sm = await claude.use("sample"); setSample(sm ? () => sm : null); } setDownloads(await claude.use("downloads")); } catch { /* standalone */ } })(); }, []);
+  const first = useRef(true);
+  useEffect(() => { if (first.current) { first.current = false; return; } adapter.save(store); }, [store]);
   useEffect(() => { if (store.profile === null && store.apps.length === 0) setView("profile"); }, []);
   const say = (tone: "ok" | "err", text: string) => setToast({ tone, text });
 
   const transport: Transport | null = useMemo(() => (sample && useClaude ? async (system, user) => {
     abort.current = new AbortController();
-    return (await sample(`${system}\n\n${user}`, { modelTier: "default", cache: false, signal: abort.current.signal, onText: () => setBusy((b) => (b.startsWith("Claude") ? b : "Claude is working…")) })).text as string;
+    const opts = { modelTier: "default", cache: false, signal: abort.current.signal, onText: () => setBusy((b) => (b.startsWith("Claude") ? b : "Claude is working…")) };
+    return (sample.complete ? (await sample.complete(system, user, opts)) : (await sample(`${system}\n\n${user}`, opts)).text) as string;
   } : null), [sample, useClaude]);
   const provider = useMemo(() => providerFor(transport), [transport]);
 
@@ -69,10 +90,11 @@ function App() {
     <div className="mx-auto max-w-6xl px-4 pb-16">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line py-4">
         <div><div className="font-mono text-[11px] uppercase tracking-[0.18em] text-gray-500">DV · SoC · RISC-V · Formal · FuSa</div><h1 className="text-xl font-semibold">Semiconductor Career Optimizer</h1></div>
-        <label className={cx("flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm", !sample && "opacity-60")} title={sample ? "Use Claude for parsing, rewrites and the cover letter. Runs on your own Claude usage." : "Claude is not available in this view; the offline engine is used."}>
+        <div className="flex flex-wrap items-center gap-3">{adapter.user && <span className="text-xs text-gray-500">{adapter.user.email} {adapter.logout && <button className="ml-1 underline" onClick={() => adapter.logout!()}>Sign out</button>}</span>}
+        <label className={cx("flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm", !sample && "opacity-60")} title={sample ? (adapter.mode === "server" ? "Sends resume and job text to the configured AI vendor from this server." : "Use Claude for parsing, rewrites and the cover letter. Runs on your own Claude usage.") : "No AI provider is available here; the offline engine is used."}>
           <input type="checkbox" id="use-claude" disabled={!sample} checked={useClaude} onChange={(e) => setUseClaude(e.target.checked)} />
-          {sample ? "Use Claude for language tasks" : "Offline engine (Claude unavailable)"}
-        </label>
+          {sample ? (adapter.mode === "server" ? `Use ${adapter.aiProvider ?? "AI"} for language tasks` : "Use Claude for language tasks") : "Offline engine (AI unavailable)"}
+        </label></div>
       </header>
       <nav className="flex flex-wrap gap-1 py-3" aria-label="Sections">{nav.map(([k, l]) => <button key={k} onClick={() => { setView(k); setOpenId(null); }} className={cx("rounded-md px-3 py-1.5 text-sm", view === k ? "bg-ink text-white" : "hover:bg-gray-100")}>{l}</button>)}</nav>
       {busy && <div role="status" className="mb-3 flex items-center justify-between rounded-md border border-line bg-gray-50 p-3 text-sm"><span>{busy}</span>{abort.current && <Button size="sm" variant="outline" onClick={() => abort.current?.abort()}>Stop</Button>}</div>}
@@ -115,7 +137,7 @@ function ProfileView({ profile, setProfile, resumes, setResumes, provider, run, 
   };
   const onFiles = (files: File[]) => run(claudeOn ? "Reading resumes with Claude…" : "Reading resumes…", async () => {
     let all: Resume[] = resumes;
-    for (const f of files) { const ex = await extractWithLayout(f); all = await addResume(f.name, ex.text, all, ex.layout); }
+    for (const f of files) { const ex = await extractWithLayout(f); all = await addResume(f.name, ex.text, all, ex.layout); if (adapter.storeFile) { try { const id = await adapter.storeFile(f); all = all.map((r, i) => (i === all.length - 1 ? { ...r, fileId: id } : r)); } catch { /* original file not stored; parsed data is kept */ } } }
     afterAdd(all);
   });
   const decide = (id: string, decision: MergeItem["decision"]) => setItems((xs) => xs.map((x) => (x.id === id ? { ...x, decision } : x)));
@@ -133,7 +155,7 @@ function ProfileView({ profile, setProfile, resumes, setResumes, provider, run, 
           {resumes.length > 0 && profile && <Button variant="outline" onClick={() => { const r = mergeResumes(resumes.map((x: Resume) => ({ id: x.id, name: x.name, profile: x.profile })), profile); setReport(r); setItems(r.items); }}>Re-analyse library against profile</Button>}
         </div>
         <details><summary className="cursor-pointer text-sm underline">Paste resume text instead</summary><Textarea id="resume-paste" aria-label="Resume text" rows={8} className="mt-2" value={paste} onChange={(e) => setPaste(e.target.value)} /><Button className="mt-2" variant="outline" disabled={paste.length < 50} onClick={() => run("Parsing…", async () => { afterAdd(await addResume(`pasted-${resumes.length + 1}.txt`, paste, resumes)); setPaste(""); })}>Add pasted resume</Button></details>
-        {resumes.length > 0 && <ul className="divide-y divide-line rounded-md border border-line text-sm">{resumes.map((r: Resume) => <li key={r.id} className="flex items-center justify-between gap-2 p-2"><span><b>{r.name}</b> <span className="text-gray-500">· {r.profile.roles.length} roles, {r.profile.roles.reduce((a, x) => a + x.responsibilities.length + x.achievements.length, 0)} bullets · {r.profile.roles[0]?.title ?? "no roles found"}</span> {r.ats && <span title={r.ats.checks.filter((c) => c.status !== "pass").map((c) => `${c.label}: ${c.detail}`).join("\n") || "No ATS issues found"}><Badge tone={r.ats.risk === "Low" ? "green" : r.ats.risk === "Medium" ? "amber" : "red"}>ATS {r.ats.risk}</Badge></span>}</span><button className="text-xs text-red-800 underline" onClick={() => setResumes((xs: Resume[]) => xs.filter((x) => x.id !== r.id))}>Remove</button></li>)}</ul>}
+        {resumes.length > 0 && <ul className="divide-y divide-line rounded-md border border-line text-sm">{resumes.map((r: Resume) => <li key={r.id} className="flex items-center justify-between gap-2 p-2"><span><b>{r.name}</b> <span className="text-gray-500">· {r.profile.roles.length} roles, {r.profile.roles.reduce((a, x) => a + x.responsibilities.length + x.achievements.length, 0)} bullets · {r.profile.roles[0]?.title ?? "no roles found"}</span> {r.ats && <span title={r.ats.checks.filter((c) => c.status !== "pass").map((c) => `${c.label}: ${c.detail}`).join("\n") || "No ATS issues found"}><Badge tone={r.ats.risk === "Low" ? "green" : r.ats.risk === "Medium" ? "amber" : "red"}>ATS {r.ats.risk}</Badge></span>}</span><button className="text-xs text-red-800 underline" onClick={() => { if (r.fileId && adapter.deleteFile) adapter.deleteFile(r.fileId).catch(() => undefined); setResumes((xs: Resume[]) => xs.filter((x) => x.id !== r.id)); }}>Remove</button></li>)}</ul>}
       </Card>
 
       {review && <ParseReview review={review} profile={profile} setProfile={setProfile} close={() => setReview(null)} />}
@@ -237,8 +259,8 @@ function AnalyzeView({ profile, run, say, onDone, provider, claudeOn, weights }:
     <div className="grid gap-4 lg:grid-cols-5">
       <Card className="space-y-3 lg:col-span-3">
         <div className="flex items-center justify-between"><Label htmlFor="jd">Job description</Label><button className="text-xs underline" onClick={() => setJd(DEMO_JD_TEXT)}>Use sample JD</button></div>
-        <Textarea id="jd" rows={22} value={jd} onChange={(e) => setJd(e.target.value)} placeholder="Paste the full job description. Job pages can't be fetched from inside Claude, so paste the text." />
-        <div><Label htmlFor="jurl">Job URL (for your records)</Label><Input id="jurl" value={f.url} onChange={set("url")} placeholder="https://…" /></div>
+        <Textarea id="jd" rows={22} value={jd} onChange={(e) => setJd(e.target.value)} placeholder={adapter.fetchJob ? "Paste the full job description, or fetch it from a URL below." : "Paste the full job description. Job pages can't be fetched from inside Claude, so paste the text."} />
+        <div><Label htmlFor="jurl">Job URL {adapter.fetchJob ? "(fetch fills the description)" : "(for your records)"}</Label><div className="flex gap-2"><Input id="jurl" value={f.url} onChange={set("url")} placeholder="https://…" />{adapter.fetchJob && <Button variant="outline" disabled={!f.url} onClick={() => run("Fetching job page…", async () => setJd(await adapter.fetchJob!(f.url)))}>Fetch</Button>}</div></div>
       </Card>
       <Card className="space-y-3 lg:col-span-2">
         <h2 className="text-sm font-semibold">Target</h2>
@@ -800,19 +822,21 @@ function VocabCard({ prefs, setPrefs, say }: { prefs: Prefs; setPrefs: (f: (p: P
 function SettingsView({ store, setStore, setPrefs, downloads, say, claudeOn }: any) {
   const file = useRef<HTMLInputElement>(null);
   const [confirm, setConfirm] = useState(false);
+  const [pw, setPw] = useState("");
   return (
     <div className="max-w-2xl space-y-4">
-      <Card className="space-y-2 text-sm"><h3 className="font-semibold">Where your data lives</h3><p>Profile, resume text and applications are stored in <b>this browser only</b> (local storage for this artifact). They are not sent anywhere unless you switch on “Use Claude”, which sends the relevant text to Claude on your own account. Clearing site data or using another device starts empty, so keep a backup.</p><p>AI: <Badge tone={claudeOn ? "green" : "amber"}>{claudeOn ? "Claude available" : "offline engine only"}</Badge></p></Card>
+      <Card className="space-y-2 text-sm"><h3 className="font-semibold">Where your data lives</h3>{adapter.mode === "server" ? <p>Your profile, resumes and applications are stored in your account on this server (private, not served at any public URL). Resume text is only sent to an AI vendor if you switch on “Use {adapter.aiProvider ?? "AI"}”; the built-in engine runs entirely in your browser.</p> : <p>Profile, resume text and applications are stored in <b>this browser only</b> (local storage for this artifact). They are not sent anywhere unless you switch on “Use Claude”, which sends the relevant text to Claude on your own account. Clearing site data or using another device starts empty, so keep a backup.</p>}<p>AI: <Badge tone={claudeOn ? "green" : "amber"}>{claudeOn ? (adapter.mode === "server" ? `${adapter.aiProvider ?? "provider"} configured` : "Claude available") : "offline engine only"}</Badge></p></Card>
       <WeightsCard prefs={store.prefs} setPrefs={setPrefs} />
       <VocabCard prefs={store.prefs} setPrefs={setPrefs} say={say} />
       <Card className="space-y-3"><h3 className="text-sm font-semibold">Backup</h3>
         <div className="flex flex-wrap gap-2"><Button variant="outline" disabled={!downloads} onClick={() => save(downloads, "career-optimizer-backup.json", JSON.stringify(store, null, 1) as any, say)}>Export backup (JSON)</Button>
           <input ref={file} id="restore" type="file" accept=".json" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; try { const s = JSON.parse(await f.text()); setStore({ prefs: { ...DEFAULT_PREFS, ...(s.prefs ?? {}) }, profile: s.profile ? ProfileSchema.parse(s.profile) : null, apps: Array.isArray(s.apps) ? s.apps : [], resumes: Array.isArray(s.resumes) ? s.resumes.map((r: Resume) => ({ ...r, profile: ProfileSchema.parse(r.profile) })) : [] }); say("ok", "Backup restored."); } catch { say("err", "That file is not a valid backup."); } e.target.value = ""; }} />
           <Button variant="outline" onClick={() => file.current?.click()}>Restore backup</Button></div></Card>
-      <Card className="space-y-3"><h3 className="text-sm font-semibold text-red-700">Delete data</h3><p className="text-sm text-gray-600">Removes your profile, uploaded resumes and every application from this browser.</p>
-        {confirm ? <div className="flex gap-2"><Button variant="danger" onClick={() => { setStore({ profile: null, apps: [], resumes: [], prefs: DEFAULT_PREFS }); ontology.setCustom([]); try { localStorage.removeItem(KEY); } catch { /* ignore */ } setConfirm(false); say("ok", "All data deleted."); }}>Yes, delete everything</Button><Button variant="ghost" onClick={() => setConfirm(false)}>Cancel</Button></div> : <Button variant="danger" onClick={() => setConfirm(true)}>Delete all my data</Button>}</Card>
+      <Card className="space-y-3"><h3 className="text-sm font-semibold text-red-700">Delete data</h3><p className="text-sm text-gray-600">{adapter.deleteAll ? "Permanently deletes your stored profile, resumes, applications and uploaded files from the server. Resume content is never used for training." : "Removes your profile, uploaded resumes and every application from this browser."}</p>
+        {adapter.deleteAll && <div><Label htmlFor="del-pw">Confirm password</Label><Input id="del-pw" type="password" value={pw} onChange={(e) => setPw(e.target.value)} /></div>}
+        {confirm ? <div className="flex flex-wrap gap-2"><Button variant="danger" disabled={!!adapter.deleteAll && !pw} onClick={async () => { try { if (adapter.deleteAll) await adapter.deleteAll(pw, "data"); setStore({ profile: null, apps: [], resumes: [], prefs: DEFAULT_PREFS }); ontology.setCustom([]); if (!adapter.deleteAll) { try { localStorage.removeItem(KEY); } catch { /* ignore */ } } setConfirm(false); say("ok", "All data deleted."); } catch (e: any) { say("err", e.message); } }}>Yes, delete everything</Button>{adapter.deleteAll && <Button variant="danger" disabled={!pw} onClick={async () => { try { await adapter.deleteAll!(pw, "account"); } catch (e: any) { say("err", e.message); } }}>Delete my whole account</Button>}<Button variant="ghost" onClick={() => setConfirm(false)}>Cancel</Button></div> : <Button variant="danger" onClick={() => setConfirm(true)}>Delete all my data</Button>}</Card>
     </div>
   );
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+adapter.load().then((raw) => createRoot(document.getElementById("root")!).render(<App initial={hydrate(raw)} />));

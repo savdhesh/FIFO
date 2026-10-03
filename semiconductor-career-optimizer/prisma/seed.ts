@@ -18,14 +18,12 @@ async function main() {
   const password = process.env.DEMO_PASSWORD ?? "demo-password-123";
   const user = await db.user.upsert({ where: { email }, update: {}, create: { email, name: "Demo User", passwordHash: await bcrypt.hash(password, 12) } });
   const profile = parseResumeHeuristic(DEMO_RESUME_TEXT);
-  await db.careerProfile.upsert({ where: { userId: user.id }, update: { data: profile as object }, create: { userId: user.id, data: profile as object } });
-
-  if (!(await db.application.count({ where: { userId: user.id } }))) {
-    const jd = parseJobDescriptionHeuristic(DEMO_JD_TEXT);
-    const settings = SettingsSchema.parse({ targetRole: jd.roleTitle, country: "USA", seniority: "Principal", length: "3" });
-    const match = analyzeMatch(profile, jd, settings);
-    await db.application.create({ data: { userId: user.id, company: jd.company, roleTitle: jd.roleTitle, jdText: DEMO_JD_TEXT, settings: settings as object, parsedJd: jd as object, match: match as object, matchScore: match.overall, recommendation: match.recommendation.verdict } });
-  }
+  const jd = parseJobDescriptionHeuristic(DEMO_JD_TEXT);
+  const settings = SettingsSchema.parse({ targetRole: jd.roleTitle, country: "USA", seniority: "Principal", length: "3" });
+  const match = analyzeMatch(profile, jd, settings);
+  const app = { id: "demo-app-1", createdAt: new Date().toISOString(), company: jd.company, roleTitle: jd.roleTitle, jobUrl: "", jdText: DEMO_JD_TEXT, settings, jd, match, tailored: null, changes: [], letter: null, status: "ANALYZED", history: [{ status: "ANALYZED", at: new Date().toISOString() }], notes: "", recruiterName: "", recruiterContact: "", appliedAt: "" };
+  const state = { profile, apps: [app], resumes: [], prefs: { theme: "plain", vocab: [] } };
+  await db.userState.upsert({ where: { userId: user.id }, update: { data: state as object }, create: { userId: user.id, data: state as object } });
   console.log(`Seeded demo user ${email} / ${password}`);
 }
 main().finally(() => db.$disconnect());

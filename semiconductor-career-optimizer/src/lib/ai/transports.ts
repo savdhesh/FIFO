@@ -7,7 +7,7 @@ async function post(url: string, headers: Record<string, string>, body: unknown)
 }
 
 export const openaiTransport = (key: string, model = "gpt-4o-mini"): Transport => async (system, user) => {
-  const j = await post("https://api.openai.com/v1/chat/completions", { authorization: `Bearer ${key}` }, {
+  const j = await post(`${process.env.OPENAI_BASE_URL || "https://api.openai.com"}/v1/chat/completions`, { authorization: `Bearer ${key}` }, {
     model, temperature: 0.2, response_format: { type: "json_object" },
     messages: [{ role: "system", content: system }, { role: "user", content: user }],
   });
@@ -15,14 +15,14 @@ export const openaiTransport = (key: string, model = "gpt-4o-mini"): Transport =
 };
 
 export const anthropicTransport = (key: string, model = "claude-sonnet-5-5"): Transport => async (system, user) => {
-  const j = await post("https://api.anthropic.com/v1/messages", { "x-api-key": key, "anthropic-version": "2023-06-01" }, {
+  const j = await post(`${process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com"}/v1/messages`, { "x-api-key": key, "anthropic-version": "2023-06-01" }, {
     model, max_tokens: 8000, temperature: 0.2, system, messages: [{ role: "user", content: user }],
   });
   return (j.content as { type: string; text?: string }[]).filter((b) => b.type === "text").map((b) => b.text).join("");
 };
 
 export const geminiTransport = (key: string, model = "gemini-2.0-flash"): Transport => async (system, user) => {
-  const j = await post(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, { "x-goog-api-key": key }, {
+  const j = await post(`${process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com"}/v1beta/models/${model}:generateContent`, { "x-goog-api-key": key }, {
     systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: user }] }],
     generationConfig: { temperature: 0.2, responseMimeType: "application/json" },
   });

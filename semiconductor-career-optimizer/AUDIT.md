@@ -26,6 +26,9 @@ Scope: the Claude artifact (`artifact/`, built to `dist/artifact.html`) and the 
 | 13 | Five textareas had no accessible name. | `aria-label`s added. |
 | 14 | Two LLM prompts (match analysis, seniority audit) were defined but never used, implying behaviour that does not exist. | Removed. Scoring is deterministic by design. |
 | 15 | Report PDF omitted strategy / credibility / ATS. | Added. |
+| 16 | **Latent bug found while building server parity:** the page stored the `sample` (ask-Claude) function with `setSample(fn)`; React treats a function argument as an updater and *called it with the previous state*. In a real Claude viewer this would have replaced `sample` with a rejected promise, so the "Use Claude" toggle looked enabled but could not work. Local tests had never exercised a function-valued `sample`. | `setSample(() => fn)`; `e2e/claude-mode.mjs` simulates a function-valued `sample` and `downloads`. |
+| 17 | Skills parsing accepted any sentence containing an ontology term as a skill ("Mentored students at a robotics club…" became a skill). | Skill items must be terms, not sentences. |
+| 18 | `claude`-only persistence: the server app lacked everything after Phase 2 in its UI. | Server serves the same workspace; old duplicate server UI and routes removed so the two cannot drift. |
 
 ## Spec coverage (brief sections)
 Legend: ✅ done · 🟡 partial · ⛔ not built
@@ -34,7 +37,7 @@ Legend: ✅ done · 🟡 partial · ⛔ not built
 |---|---|---|---|
 | 1 | Core workflow (1–12) | ✅ | Job **URL fetch** works in the server app only; the artifact cannot fetch pages (paste text). |
 | 2 | Stack | 🟡 | Next/React/TS/Tailwind/Prisma/Postgres ✅. shadcn-*style* hand-written components, not the shadcn CLI. Auth is a custom signed-cookie session ("or equivalent"). S3 storage written but untested. |
-| 2 | AI provider abstraction | ✅ | Mock, OpenAI, Anthropic, Gemini, Claude-in-artifact. **OpenAI/Anthropic/Gemini never run against live endpoints.** |
+| 2 | AI provider abstraction | ✅ | Mock, OpenAI, Anthropic, Gemini, Claude-in-artifact. OpenAI-compatible path tested against a local stub; **no vendor has been run live.** |
 | 3 | Privacy | ✅ | Server: private storage, deletion, no content logging. Artifact: data stays in the browser. |
 | 4 | Master profile | ✅ | Parser is heuristic; unusual layouts need manual correction. |
 | 5 | Ontology | ✅ | 165 terms; exact/equivalent/related/weak/missing. |
@@ -60,11 +63,11 @@ Legend: ✅ done · 🟡 partial · ⛔ not built
 | 32 | Demo data | ✅ | Fictional. |
 | 33 | Security | ✅ | Server app. |
 | 35 | Acceptance scenario | ✅ | `tests/acceptance.test.ts`. |
-| 37 | Tests, README, schema, migrations, seed | ✅ | 156 tests. |
+| 37 | Tests, README, schema, migrations, seed | ✅ | 209 unit tests + browser e2e scripts. |
 
 ## Known limits that remain
 - **Separate GitHub repo**: the GitHub integration returned 403 on repo creation; the project is a self-contained folder in `savdhesh/FIFO`.
 - **Not verifiable here**: Claude `sample` (the "Use Claude" toggle) and `downloads` (saving files) only run in the real claude.ai viewer; the .pptx was validated structurally but not rendered visually.
-- **Server app vs artifact**: the Next.js app has the Phase 3–4 engines and a route for them but not the later UI (merge review, deck, ATS panel, strategy, analytics, versions, settings).
+- **Server app vs artifact**: now the same workspace (Phase 6). The OpenAI/Anthropic/Gemini transports were exercised against a local stub (request shape, key handling, JSON mode) but never against the real vendors.
 - **Heuristic parsing** remains the main accuracy risk for real-world resumes.
 - **Single-sample statistics**: analytics warns below 5 applications.

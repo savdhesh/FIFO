@@ -12,6 +12,6 @@ export const DELETE = route(async (req, { user }) => {
   const files = await db.resumeFile.findMany({ where: { userId: user.id }, select: { storageKey: true } });
   await Promise.all(files.map((f) => storage().delete(f.storageKey).catch(() => undefined)));
   if (b.scope === "account") { await db.user.delete({ where: { id: user.id } }); await destroySession(); }
-  else await db.$transaction([db.resumeFile.deleteMany({ where: { userId: user.id } }), db.application.deleteMany({ where: { userId: user.id } }), db.careerProfile.deleteMany({ where: { userId: user.id } })]);
+  else await db.$transaction([db.resumeFile.deleteMany({ where: { userId: user.id } }), db.userState.deleteMany({ where: { userId: user.id } })]);
   return json({ ok: true });
 }, { limit: { max: 5, windowMs: 3600_000, name: "delete-account" } });
