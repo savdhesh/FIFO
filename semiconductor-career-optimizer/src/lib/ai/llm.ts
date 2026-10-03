@@ -13,6 +13,7 @@ import type { CoverLetter } from "../tailoring/cover-letter";
 import { countryStyle } from "../countries";
 import { planLinkedIn, type LinkedInPlan } from "../outreach/linkedin";
 import { planOutreach, type OutreachPack } from "../outreach/recruiter";
+import { planInterview, type InterviewPlan } from "../interview/interview";
 
 export type Transport = (system: string, user: string) => Promise<string>;
 
@@ -120,6 +121,22 @@ export class LLMProvider implements AIProvider {
       const rank: Record<ClaimStatus, number> = { VERIFIED: 0, SUPPORTED: 1, INFERRED: 2, UNSUPPORTED: 3 };
       // The model may only make the verdict STRICTER than the deterministic checker.
       return det.map((d) => { const m = out.checks.find((c) => c.text === d.text); return m && rank[m.status] > rank[d.status] ? { ...d, status: m.status, hallucination: m.status === "UNSUPPORTED", reasons: [...d.reasons, ...m.reasons.map((r) => `Model: ${r}`)] } : d; });
+    } catch { return det; }
+  }
+  async generateInterviewPrep(p: Profile, jd: Parameters<AIProvider["generateInterviewPrep"]>[1], m: Parameters<AIProvider["generateInterviewPrep"]>[2], s: Parameters<AIProvider["generateInterviewPrep"]>[3]): Promise<InterviewPlan> {
+    const det = planInterview(p, jd, m, s);
+    const top = [...det.questions.slice(0, 8), ...det.gapQuestions.slice(0, 3), ...det.resumeDrills.slice(0, 3)];
+    try {
+      const out = await structured(this.transport, z.object({ outlines: z.array(z.object({ id: z.string(), outline: z.string().min(20).max(900) })) }), PROMPTS.interview,
+        JSON.stringify({ role: jd.roleTitle, level: det.targetLevelName, questions: top.map((q) => ({ id: q.id, q: q.q, points: q.points, evidence: q.evidence.map((e) => e.text), stance: q.stance })) }));
+      const idx = buildIndex(p);
+      const apply = (q: (typeof top)[number]) => {
+        const o = out.outlines.find((x) => x.id === q.id);
+        if (!o) return q;
+        // The outline may only restate what the profile supports; anything else drops the outline (never the question).
+        return sanitizeProse(o.outline, { index: idx, allowedNames: [jd.company, jd.roleTitle] }, false).removed.length ? q : { ...q, outline: o.outline };
+      };
+      return { ...det, questions: det.questions.map(apply), gapQuestions: det.gapQuestions.map(apply), resumeDrills: det.resumeDrills.map(apply) };
     } catch { return det; }
   }
   async optimizeLinkedIn(p: Profile, jd: Parameters<AIProvider["optimizeLinkedIn"]>[1], m: Parameters<AIProvider["optimizeLinkedIn"]>[2], s: Parameters<AIProvider["optimizeLinkedIn"]>[3], current?: { headline?: string; about?: string }): Promise<LinkedInPlan> {

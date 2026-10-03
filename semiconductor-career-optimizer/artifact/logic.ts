@@ -9,13 +9,14 @@ import type { ChangeProposal, MatchResult, ParsedJD, Profile, Settings, Tailored
 import type { CoverLetter } from "../src/lib/tailoring/cover-letter";
 import type { LinkedInPlan } from "../src/lib/outreach/linkedin";
 import type { OutreachPack } from "../src/lib/outreach/recruiter";
+import type { InterviewPlan } from "../src/lib/interview/interview";
 
 export interface AppRecord {
   id: string; createdAt: string; company: string; roleTitle: string; jobUrl: string; jdText: string;
   settings: Settings; jd: ParsedJD; match: MatchResult;
   tailored: TailoredResume | null; changes: ChangeProposal[]; letter: CoverLetter | null;
   status: string; notes: string; recruiterName: string; recruiterContact: string; appliedAt: string;
-  linkedin?: LinkedInPlan | null; outreach?: OutreachPack | null; history?: { status: string; at: string }[];
+  linkedin?: LinkedInPlan | null; outreach?: OutreachPack | null; interview?: InterviewPlan | null; prepDone?: Record<string, boolean>; history?: { status: string; at: string }[];
 }
 
 export type Transport = (system: string, user: string) => Promise<string>;

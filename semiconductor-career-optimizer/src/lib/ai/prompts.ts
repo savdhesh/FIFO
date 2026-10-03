@@ -24,6 +24,7 @@ Task: write a 250-400 word cover letter in 4 paragraphs: role+positioning, most 
 Task: classify each claim as VERIFIED | SUPPORTED | INFERRED | UNSUPPORTED against the profile. Return {checks:[{text,status,reasons[]}]}.`,
   seniorityAudit: `${RULES}
 Task: identify weak bullets and seniority signals without inflating the candidate's level.`,
+  interview: `${RULES}\nTask: for each interview question write a short answer OUTLINE (3-5 sentences) that tells the candidate how to structure an honest answer using ONLY the supplied evidence. If stance is gap or related, the outline must say so plainly and bridge to real related work; never imply direct experience. Return {outlines:[{id,outline}]}.`,
   linkedin: `${RULES}\nTask: rewrite the LinkedIn About draft for recruiter discoverability. Do not copy resume bullets; lead with scope and keywords in the first 300 characters. Use only facts in the profile; no metrics, titles or tools that are absent. Return {about: string} (max 2600 chars, plain text, short paragraphs).`,
   recruiterMessage: `${RULES}\nTask: polish the outreach drafts. Keep each concise, keep bracketed placeholders like [Name] untouched, never invent names, mutual contacts, shared history or knowledge of the company beyond the posting. Connection request must stay within 300 characters. Return {messages:[{kind,text}]} using the same kinds.`,
 };

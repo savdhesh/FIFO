@@ -3,6 +3,7 @@ import type { BulletRewrite } from "../tailoring/resume";
 import type { CoverLetter } from "../tailoring/cover-letter";
 import type { LinkedInPlan } from "../outreach/linkedin";
 import type { OutreachPack } from "../outreach/recruiter";
+import type { InterviewPlan } from "../interview/interview";
 
 export class NotImplementedError extends Error {
   constructor(feature: string) { super(`${feature} is not available yet (planned for a later phase).`); }
@@ -22,6 +23,8 @@ export interface AIProvider {
   rewriteResume(profile: Profile, jd: ParsedJD, match: MatchResult): Promise<BulletRewrite[]>;
   generateCoverLetter(profile: Profile, jd: ParsedJD, match: MatchResult, settings: Settings): Promise<CoverLetter>;
   auditClaims(profile: Profile, claims: string[]): Promise<ClaimCheck[]>;
+  // Phase 4
+  generateInterviewPrep(profile: Profile, jd: ParsedJD, match: MatchResult, settings: Settings): Promise<InterviewPlan>;
   // Phase 3
   optimizeLinkedIn(profile: Profile, jd: ParsedJD, match: MatchResult, settings: Settings, current?: { headline?: string; about?: string }): Promise<LinkedInPlan>;
   generateRecruiterMessage(profile: Profile, jd: ParsedJD, match: MatchResult, settings: Settings, opts?: { recruiterName?: string; hiringManagerName?: string }): Promise<OutreachPack>;

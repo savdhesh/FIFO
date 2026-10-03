@@ -12,6 +12,7 @@ import { packName } from "../src/lib/export/names";
 import { auditProse } from "../src/lib/truth/truth";
 import { acceptSafeItems, applyMerge, mergeResumes, type MergeItem, type MergeReport } from "../src/lib/merge/merge";
 import { buildDeck, deckBuffer } from "../src/lib/deck/deck";
+import { computeAnalytics } from "../src/lib/analytics/analytics";
 import { buildIndex } from "../src/lib/profile-index";
 
 declare const claude: any;
@@ -27,7 +28,7 @@ const errCopy = (e: any) => (e?.code === "not_granted" ? "Claude access was decl
 
 function App() {
   const [store, setStore] = useState<Store>(load);
-  const [view, setView] = useState<"profile" | "analyze" | "apps" | "deck" | "settings">("profile");
+  const [view, setView] = useState<"profile" | "analyze" | "apps" | "analytics" | "deck" | "settings">("profile");
   const [openId, setOpenId] = useState<string | null>(null);
   const [sample, setSample] = useState<any>(null);
   const [downloads, setDownloads] = useState<any>(null);
@@ -52,7 +53,7 @@ function App() {
   const updateApp = (a: AppRecord) => setStore((s) => ({ ...s, apps: s.apps.map((x) => (x.id === a.id ? a : x)) }));
   const open = store.apps.find((a) => a.id === openId) ?? null;
 
-  const nav: [typeof view, string][] = [["profile", "Profile"], ["analyze", "Analyze a job"], ["apps", `Applications (${store.apps.length})`], ["deck", "Presentation"], ["settings", "Settings"]];
+  const nav: [typeof view, string][] = [["profile", "Profile"], ["analyze", "Analyze a job"], ["apps", `Applications (${store.apps.length})`], ["analytics", "Analytics"], ["deck", "Presentation"], ["settings", "Settings"]];
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line py-4">
@@ -70,6 +71,7 @@ function App() {
       {view === "analyze" && <AnalyzeView profile={store.profile} run={run} say={say} onDone={(a: AppRecord) => { setStore((s) => ({ ...s, apps: [a, ...s.apps] })); setOpenId(a.id); setView("apps"); }} provider={provider} claudeOn={!!transport} />}
       {view === "apps" && !open && <AppsList apps={store.apps} open={setOpenId} />}
       {view === "apps" && open && store.profile && <AppDetail key={open.id} app={open} profile={store.profile} update={updateApp} back={() => setOpenId(null)} remove={() => { setStore((s) => ({ ...s, apps: s.apps.filter((x) => x.id !== open.id) })); setOpenId(null); }} provider={provider} run={run} say={say} downloads={downloads} />}
+      {view === "analytics" && <AnalyticsView apps={store.apps} open={(id: string) => { setOpenId(id); setView("apps"); }} />}
       {view === "deck" && <DeckView profile={store.profile} apps={store.apps} downloads={downloads} say={say} />}
       {view === "settings" && <SettingsView store={store} setStore={setStore} downloads={downloads} say={say} claudeOn={!!sample} />}
     </div>
@@ -242,7 +244,7 @@ function AppsList({ apps: all, open }: { apps: AppRecord[]; open: (id: string) =
   );
 }
 
-const TABS = ["Overview", "Requirements", "Skill Match", "Resume Changes", "Cover Letter", "LinkedIn", "Recruiter Messages", "Truth Audit", "Tracking"];
+const TABS = ["Overview", "Requirements", "Skill Match", "Resume Changes", "Cover Letter", "LinkedIn", "Recruiter Messages", "Interview Prep", "Truth Audit", "Tracking"];
 function AppDetail({ app: a, profile, update, back, remove, provider, run, say, downloads }: any) {
   const [tab, setTab] = useState("Overview");
   const doc = useMemo(() => { try { return a.tailored ? finalDocs(a, profile) : null; } catch { return null; } }, [a, profile]);
@@ -260,6 +262,7 @@ function AppDetail({ app: a, profile, update, back, remove, provider, run, say, 
       {tab === "Cover Letter" && <CoverLetterTab a={a} profile={profile} update={update} provider={provider} run={run} say={say} doc={doc} downloads={downloads} />}
       {tab === "LinkedIn" && <LinkedInTab a={a} profile={profile} update={update} provider={provider} run={run} say={say} />}
       {tab === "Recruiter Messages" && <OutreachTab a={a} profile={profile} update={update} provider={provider} run={run} say={say} />}
+      {tab === "Interview Prep" && <InterviewTab a={a} profile={profile} update={update} provider={provider} run={run} />}
       {tab === "Truth Audit" && <TruthAudit a={a} doc={doc} profile={profile} downloads={downloads} say={say} />}
       {tab === "Tracking" && <Tracking a={a} update={update} remove={remove} say={say} />}
     </div>
@@ -522,6 +525,83 @@ function DeckView({ profile, apps, downloads, say }: { profile: Profile | null; 
       <div className="space-y-2 lg:col-span-2"><h3 className="text-sm font-semibold">{deck.slides.length} slides</h3>
         {deck.slides.map((s, i) => <Card key={i} className="p-3"><div className="flex items-baseline gap-3"><span className="font-mono text-xs text-gray-500">{String(i + 1).padStart(2, "0")}</span><b className="text-sm">{s.title}</b><Badge>{s.kind}</Badge></div>{s.lines.filter((l) => !l.startsWith("tag: ")).length > 0 && <ul className="mt-1 text-sm text-gray-700">{s.lines.filter((l) => !l.startsWith("tag: ")).slice(0, 5).map((l, j) => <li key={j}>{l}</li>)}</ul>}{s.lines.some((l) => l.startsWith("tag: ")) && <div className="mt-1 flex flex-wrap gap-1">{s.lines.filter((l) => l.startsWith("tag: ")).map((l) => <Badge key={l} tone="blue">{l.slice(5)}</Badge>)}</div>}</Card>)}
       </div>
+    </div>
+  );
+}
+
+
+/* ---------- Phase 4: interview prep + analytics ---------- */
+const probTone = (p: string) => (p === "High" ? "red" : p === "Medium" ? "amber" : "gray");
+const levelTone = (l: number) => (l >= 4 ? "red" : l === 3 ? "amber" : l === 2 ? "blue" : "green");
+
+function InterviewTab({ a, profile, update, provider, run }: any) {
+  const [src, setSrc] = useState<"bank" | "resume" | "gap" | "live">("bank");
+  const [lvl, setLvl] = useState(0);
+  const plan = a.interview;
+  const done: Record<string, boolean> = a.prepDone ?? {};
+  const build = () => run("Building interview prep…", async () => update({ ...a, interview: await provider.generateInterviewPrep(profile, a.jd, a.match, a.settings) }));
+  const list = !plan ? [] : (src === "bank" ? plan.questions : src === "resume" ? plan.resumeDrills : plan.gapQuestions).filter((q: any) => !lvl || q.level === lvl);
+  const total = plan ? plan.questions.length + plan.resumeDrills.length + plan.gapQuestions.length : 0;
+  const nDone = plan ? [...plan.questions, ...plan.resumeDrills, ...plan.gapQuestions].filter((q: any) => done[q.id]).length : 0;
+  return (
+    <div className="space-y-4">
+      <Card className="flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-3xl text-sm text-gray-700">Likely questions from this job description and your own resume. Evidence shown is your own profile text; where you have a gap, the note says to be honest and bridge to real related work. {plan && <b>{nDone}/{total} prepared.</b>}</p>
+        <Button onClick={build}>{plan ? "Rebuild" : "Build interview prep"}</Button>
+      </Card>
+      {plan && <>
+        <Card><h3 className="mb-2 text-sm font-semibold">Topic likelihood <span className="font-normal text-gray-500">· weighted to {plan.targetLevelName} level</span></h3>
+          <div className="grid gap-x-8 gap-y-1 md:grid-cols-2">{plan.topics.map((t: any) => <div key={t.topic} className="text-sm" title={t.reasons.join("; ")}><div className="flex items-center justify-between gap-2"><span>{t.display} {t.stance !== "strength" && <Badge tone={t.stance === "gap" ? "red" : "amber"}>{t.stance}</Badge>}</span><Badge tone={probTone(t.probability)}>{t.probability}</Badge></div><div className="mt-0.5 h-1 rounded bg-gray-100"><div className="h-1 rounded bg-ink" style={{ width: `${Math.min(100, t.score * 10)}%` }} /></div></div>)}</div>
+          <ul className="mt-3 list-disc pl-5 text-xs text-gray-500">{plan.notes.map((n: string, i: number) => <li key={i}>{n}</li>)}</ul></Card>
+        <div className="flex flex-wrap items-center gap-2" role="tablist">{([["bank", `Top ${plan.questions.length}`], ["resume", `From your resume (${plan.resumeDrills.length})`], ["gap", `Your gaps (${plan.gapQuestions.length})`], ["live", "Live exercises"]] as const).map(([k, l]) => <button key={k} role="tab" aria-selected={src === k} onClick={() => setSrc(k)} className={cx("rounded-md border border-line px-3 py-1 text-sm", src === k && "bg-ink text-white")}>{l}</button>)}
+          {src !== "live" && <span className="ml-3 flex gap-1" role="group" aria-label="Level">{[[0, "All"], [1, "Basic"], [2, "Intermediate"], [3, "Staff"], [4, "Principal"]].map(([v, l]) => <button key={v as number} onClick={() => setLvl(v as number)} className={cx("rounded-md border border-line px-2 py-1 text-xs", lvl === v && "bg-ink text-white")}>{l}</button>)}</span>}</div>
+        {src === "live" ? <Card><h3 className="mb-2 text-sm font-semibold">Likely live exercises</h3>{plan.liveExercises.length ? <ul className="list-disc space-y-1 pl-5 text-sm">{plan.liveExercises.map((x: string, i: number) => <li key={i}>{x}</li>)}</ul> : <p className="text-sm text-gray-500">Nothing in this job points at a specific live exercise.</p>}</Card>
+          : <div className="space-y-3">{list.map((q: any) => (
+            <Card key={q.id} className={cx(done[q.id] && "opacity-70")}>
+              <div className="mb-1 flex flex-wrap items-center gap-2"><Badge tone={levelTone(q.level)}>{q.levelName}</Badge>{q.stance !== "strength" && <Badge tone={q.stance === "gap" ? "red" : "amber"}>{q.stance === "gap" ? "gap: be honest" : "related only"}</Badge>}<span className="text-xs text-gray-500">{q.source === "resume" ? "from your resume" : q.topic}</span>
+                <label className="ml-auto flex items-center gap-2 text-sm"><input type="checkbox" id={`prep-${q.id}`} checked={!!done[q.id]} onChange={(e) => update({ ...a, prepDone: { ...done, [q.id]: e.target.checked } })} />Prepared</label></div>
+              <p className="text-sm font-medium">{q.q}</p>
+              <p className="mt-1 text-xs text-gray-500"><b>Why likely:</b> {q.whyLikely}</p>
+              <details className="mt-2"><summary className="cursor-pointer text-sm underline">What a good answer covers</summary>
+                <ul className="mt-1 list-disc pl-5 text-sm text-gray-700">{q.points.map((p: string, i: number) => <li key={i}>{p}</li>)}</ul>
+                {q.follow && <p className="mt-1 text-sm"><b>Likely follow-up:</b> {q.follow}</p>}
+                {q.outline && <p className="mt-2 rounded bg-gray-50 p-2 text-sm"><b>Outline:</b> {q.outline}</p>}
+                {q.honestyNote && <p className="mt-2 rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-800">{q.honestyNote}</p>}
+                {q.evidence.length > 0 && <div className="mt-2"><Label>Your own example to draw on</Label>{q.evidence.map((e: any, i: number) => <p key={i} className="text-sm"><span className="text-xs text-gray-500">{e.label}: </span>{e.text}</p>)}</div>}
+              </details>
+            </Card>))}{!list.length && <Card className="text-sm text-gray-500">No questions at this level.</Card>}</div>}
+      </>}
+    </div>
+  );
+}
+
+function Bars({ rows, label }: { rows: { name: string; value: number; sub?: string }[]; label: string }) {
+  const max = Math.max(1, ...rows.map((r) => r.value));
+  return <div role="img" aria-label={label} className="space-y-1">{rows.map((r) => <div key={r.name} className="grid grid-cols-[8rem_1fr_3.5rem] items-center gap-2 text-sm"><span className="truncate">{r.name}</span><div className="h-3 rounded bg-gray-100"><div className="h-3 rounded bg-accent" style={{ width: `${(r.value / max) * 100}%` }} /></div><span className="text-right font-mono text-xs">{r.value}{r.sub ? ` ${r.sub}` : ""}</span></div>)}</div>;
+}
+
+function AnalyticsView({ apps, open }: { apps: AppRecord[]; open: (id: string) => void }) {
+  const A = useMemo(() => computeAnalytics(apps as any), [apps]);
+  if (!apps.length) return <Card className="text-sm text-gray-600">Analyze a few jobs to see trends. Analytics are computed from your saved applications, in this browser.</Card>;
+  const stat = (l: string, v: string | number | null, sub?: string) => <Card><div className="text-xs uppercase tracking-wide text-gray-500">{l}</div><div className="font-mono text-2xl">{v ?? "–"}</div>{sub && <div className="text-xs text-gray-500">{sub}</div>}</Card>;
+  return (
+    <div className="space-y-4">
+      {A.total < 5 && <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">Fewer than 5 applications analysed, so the percentages and trends here are not meaningful yet.</p>}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">{stat("Applications", A.total, `${A.thisWeek} this week`)}{stat("Average match", A.avgScore)}{stat("Response rate", A.responseRate === null ? null : `${A.responseRate}%`)}{stat("Interview rate", A.interviewRate === null ? null : `${A.interviewRate}%`)}{stat("Median days to response", A.daysToFirstResponse.median, `${A.daysToFirstResponse.n} samples`)}</div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card><h3 className="mb-2 text-sm font-semibold">Funnel</h3><Bars label="Application funnel" rows={A.funnel.map((f) => ({ name: f.stage, value: f.count, sub: f.rate === null ? "" : `${f.rate}%` }))} /></Card>
+        <Card><h3 className="mb-2 text-sm font-semibold">Last 8 weeks</h3><Bars label="Applications analysed per week" rows={A.weekly.map((w) => ({ name: w.weekStart.slice(5), value: w.analyzed, sub: `/${w.applied}` }))} /><p className="mt-1 text-xs text-gray-500">analysed / applied per week</p></Card>
+      </div>
+      <Card><h3 className="mb-2 text-sm font-semibold">Does match score predict progress?</h3><p className="text-sm">Reached screening or later: <b>{A.scoreVsOutcome.progressed.avg ?? "–"}</b> avg match (n={A.scoreVsOutcome.progressed.n}) · Stalled or rejected: <b>{A.scoreVsOutcome.stalled.avg ?? "–"}</b> (n={A.scoreVsOutcome.stalled.n})</p>{A.scoreVsOutcome.caution && <p className="mt-1 text-xs text-amber-800">{A.scoreVsOutcome.caution}</p>}</Card>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card><h3 className="mb-2 text-sm font-semibold">What jobs ask for most <span className="font-normal text-gray-500">(weighted by importance)</span></h3>{A.demand.map((d) => <div key={d.term} className="flex items-center justify-between border-b border-line py-1 text-sm last:border-0"><span>{d.term} <span className="text-xs text-gray-500">{d.jobs} job(s)</span></span><Badge tone={d.yours === "strong" ? "green" : d.yours === "partial" ? "amber" : "red"}>{d.yours === "strong" ? "you have it" : d.yours === "partial" ? "partial" : "gap"}</Badge></div>)}</Card>
+        <Card><h3 className="mb-2 text-sm font-semibold">Gaps to prioritise</h3>{A.gapPriorities.slice(0, 8).map((g) => <div key={g.term} className="border-b border-line py-2 text-sm last:border-0"><div className="flex items-center justify-between"><b>{g.term}</b><span className="flex items-center gap-2"><span className="text-xs text-gray-500">{g.jobs} job(s)</span><Badge tone={g.kind === "presentation-gap" ? "blue" : "red"}>{g.kind === "presentation-gap" ? "presentation" : "real gap"}</Badge></span></div><p className="text-xs text-gray-600">{g.advice}</p></div>)}{!A.gapPriorities.length && <p className="text-sm text-gray-500">No gaps recorded.</p>}</Card>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card><h3 className="mb-2 text-sm font-semibold">Recommendation mix</h3>{Object.entries(A.verdicts).map(([k, v]) => <div key={k} className="flex justify-between text-sm"><span>{k}</span><span className="font-mono">{v}</span></div>)}</Card>
+        <Card><h3 className="mb-2 text-sm font-semibold">By country</h3>{A.byCountry.map((c) => <div key={c.country} className="flex justify-between text-sm"><span>{c.country}</span><span className="font-mono">{c.n} · avg {c.avg}</span></div>)}</Card>
+      </div>
+      <Card><ul className="list-disc space-y-1 pl-5 text-sm text-gray-700">{A.notes.map((n, i) => <li key={i}>{n}</li>)}</ul></Card>
     </div>
   );
 }
