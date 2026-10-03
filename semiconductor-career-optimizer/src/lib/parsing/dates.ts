@@ -33,10 +33,10 @@ export function totalYears(ranges: { start: string; end: string }[]): number {
   let total = 0, curS = -1, curE = -1;
   for (const [s, e] of spans) {
     if (curS < 0) { curS = s; curE = e; }
-    else if (s <= curE) curE = Math.max(curE, e);
-    else { total += curE - curS; curS = s; curE = e; }
+    else if (s <= curE + 1) curE = Math.max(curE, e);
+    else { total += curE - curS + 1; curS = s; curE = e; }
   }
-  if (curS >= 0) total += curE - curS;
+  if (curS >= 0) total += curE - curS + 1;
   return Math.floor((total / 12) * 2) / 2;
 }
 

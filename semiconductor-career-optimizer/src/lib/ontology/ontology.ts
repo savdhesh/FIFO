@@ -37,7 +37,7 @@ export class Ontology {
     const body = alias.split(/[\s\-_]+/).map(escapeRe).join("[\\s\\-_]*");
     const plural = alias.length > 4 && !caseSensitive && /[a-z]$/i.test(alias) ? "s?" : "";
     const left = "(?<![A-Za-z0-9+#])";
-    const right = alias === "C" ? "(?![A-Za-z0-9+#])(?!\\s*[a-z])" : "(?![A-Za-z0-9#]|\\+\\+(?!\\+))";
+    const right = alias === "C" ? "(?![A-Za-z0-9+#])" : "(?![A-Za-z0-9#]|\\+\\+(?!\\+))";
     // 'C++' must not be swallowed by 'C'; C only matches when not followed by + or word char.
     return new RegExp(`${left}${body}${plural}${right}`, caseSensitive ? "g" : "gi");
   }

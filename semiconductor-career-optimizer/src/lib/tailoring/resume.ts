@@ -31,28 +31,10 @@ function bulletRelevance(text: string, jdWeights: Map<string, number>): number {
 }
 
 /** Deterministic, conservative bullet rewrites. Anything that attributes role-level facts to a bullet is INFERRED. */
-export function deterministicRewrites(profile: Profile, jd: ParsedJD, match: MatchResult, idx: ProfileIndex): BulletRewrite[] {
+export function deterministicRewrites(_profile: Profile, _jd: ParsedJD, match: MatchResult, _idx: ProfileIndex): BulletRewrite[] {
   const out: BulletRewrite[] = [];
-  const jdTerms = new Set(jd.requirements.flatMap((r) => r.terms));
-  for (const role of profile.roles) {
-    const seen: string[] = [];
-    for (const b of roleBullets(role)) {
-      const cls = classifyBullet(b, seen);
-      seen.push(b);
-      const present = new Set(ontology.findTerms(b).map((h) => h.canonical));
-      // Role-level facts that the JD wants and this bullet does not mention.
-      const SCOPE_TYPES = new Set(["language", "simulator", "formal-tool", "protocol", "processor", "tool", "scripting"]);
-      const missingScope = [...role.tools, ...role.technologies, ...role.protocols]
-        .filter((t) => jdTerms.has(t) && !present.has(t) && SCOPE_TYPES.has(ontology.get(t)?.type ?? "")).slice(0, 3);
-      if ((cls.cls === "Weak" || cls.cls === "Generic") && missingScope.length) {
-        out.push({
-          roleId: role.id, original: b,
-          proposed: `${b.replace(/[.;]\s*$/, "")}, using ${missingScope.join(", ")}.`,
-          reason: `${cls.cls} bullet (${cls.reason}). Adds scope that the JD asks for and that your ${role.title || "role"} lists at role level — confirm it applies to this work.`,
-        });
-      }
-    }
-  }
+  // Weak/generic bullets are surfaced for the user to rewrite (Overview tab); an LLM provider may propose rewrites.
+  // Deterministic mode deliberately does not attach role-level tools to individual bullets: that would be guesswork.
   // Keyword presentation gaps: attach the phrase to the bullet that evidences the practice.
   for (const k of match.keywordAnalysis.filter((x) => x.suggestion)) {
     const req = match.requirements.find((r) => r.requirement === k.term);
