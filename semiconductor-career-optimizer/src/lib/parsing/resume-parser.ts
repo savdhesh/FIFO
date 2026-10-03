@@ -10,6 +10,7 @@ const SECTION_PATTERNS: [string, RegExp][] = [
   ["skills", /^(?:(?:technical|core|key)\s+)?(?:skills|competencies|expertise|proficiency|skills\s*(?:&|and)\s*tools|tools\s*(?:&|and)\s*technologies)(?:\s+summary)?$/i],
   ["projects", /^(?:(?:major|key|technical|selected)\s+)?projects$/i],
   ["certifications", /^(?:certifications?|licenses?(?:\s*&\s*certifications?)?|courses|training)$/i],
+  ["achievements", /^(?:key\s+|major\s+|notable\s+)?(?:achievements?|accomplishments?|awards?(?:\s*(?:&|and)\s*(?:honou?rs|recognition))?|honou?rs|recognition)$/i],
   ["publications", /^(?:publications?|patents?|papers|patents?\s*(?:&|and)\s*publications?)$/i],
 ];
 const TITLE_RE = /\b(engineer|architect|manager|lead|director|consultant|intern|staff|principal|senior|developer|specialist|scientist|head|trainee|associate|analyst|member of technical staff|mts|designer)\b/i;
@@ -254,6 +255,36 @@ function parseEducation(lines: string[]) {
   return out;
 }
 
+function parseProjects(lines: string[]): Profile["projects"] {
+  const out: Profile["projects"] = [];
+  let cur: Profile["projects"][number] | null = null;
+  for (const raw of lines) {
+    const t = raw.trim();
+    if (!t) continue;
+    if (BULLET_RE.test(raw)) {
+      const b = t.replace(BULLET_RE, "");
+      if (!cur) { cur = { id: uid(), name: "", employer: "", period: "", summary: "", highlights: [], technologies: [] }; out.push(cur); }
+      if (/^[a-z(]/.test(b) && cur.highlights.length) cur.highlights[cur.highlights.length - 1] += " " + b; else cur.highlights.push(b);
+    } else if (cur && cur.highlights.length && /^[a-z]/.test(t)) cur.highlights[cur.highlights.length - 1] += " " + t; // wrapped
+    else if (t.length < 110 && !/[.;]$/.test(t)) {
+      // Project title line: "Name | Employer | 2021 – 2022" / "Name (2021)" / "Name — Employer"
+      const dr = t.match(DATE_RANGE_RE);
+      const period = dr ? dr[0] : t.match(/\b(?:19|20)\d{2}\b/)?.[0] ?? "";
+      const head = t.replace(DATE_RANGE_RE, " ").replace(/\(\s*\)/g, " ").replace(/\s+/g, " ").trim();
+      const parts = head.split(/\s*[|–—]\s*|\s+-\s+/).map((x) => x.replace(/^[(\s]+|[)\s,]+$/g, "")).filter(Boolean);
+      cur = { id: uid(), name: parts[0] ?? head, employer: parts[1] ?? "", period, summary: "", highlights: [], technologies: [] };
+      out.push(cur);
+    } else if (cur && !cur.summary && !cur.highlights.length) cur.summary = t;
+    else if (cur) cur.highlights.push(t);
+  }
+  for (const p of out) {
+    const tmp = { technologies: [] as string[], tools: [] as string[], protocols: [] as string[], methodologies: [] as string[] };
+    categorize([p.summary, ...p.highlights].join("\n"), tmp);
+    p.technologies = [...new Set([...tmp.tools, ...tmp.protocols, ...tmp.technologies, ...tmp.methodologies])];
+  }
+  return out.filter((p) => p.name || p.highlights.length);
+}
+
 export function parseResumeHeuristic(raw: string): Profile {
   const text = normalizeText(raw);
   const { head, sections } = splitSections(text);
@@ -266,6 +297,8 @@ export function parseResumeHeuristic(raw: string): Profile {
     skills: parseSkills(sections.skills ?? [], text),
     certifications: (sections.certifications ?? []).map((l) => l.replace(BULLET_RE, "").trim()).filter(Boolean),
     publications: (sections.publications ?? []).map((l) => l.replace(BULLET_RE, "").trim()).filter(Boolean),
+    projects: parseProjects(sections.projects ?? []),
+    achievements: (sections.achievements ?? []).map((l) => l.replace(BULLET_RE, "").trim()).filter(Boolean),
   };
   return ProfileSchema.parse(profile);
 }

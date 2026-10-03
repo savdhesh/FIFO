@@ -28,6 +28,13 @@ export function buildIndex(profile: Profile): ProfileIndex {
   }
   for (const [cat, vals] of Object.entries(profile.skills)) if (vals.length) items.push({ roleId: "skills", roleLabel: "Skills", field: cat, text: vals.join(", "), kind: "skills" });
   if (profile.summary) items.push({ roleId: "summary", roleLabel: "Summary", field: "summary", text: profile.summary, kind: "summary" });
+  for (const pr of profile.projects ?? []) {
+    const label = [pr.name, pr.employer].filter(Boolean).join(" @ ") || "Project";
+    if (pr.summary) items.push({ roleId: `project:${pr.id}`, roleLabel: label, field: "summary", text: pr.summary, kind: "bullet" });
+    for (const h of pr.highlights) items.push({ roleId: `project:${pr.id}`, roleLabel: label, field: "bullet", text: h, kind: "bullet" });
+    if (pr.technologies.length) items.push({ roleId: `project:${pr.id}`, roleLabel: label, field: "technologies", text: pr.technologies.join(", "), kind: "role-field" });
+  }
+  for (const a of profile.achievements ?? []) items.push({ roleId: "achievements", roleLabel: "Key achievements", field: "achievement", text: a, kind: "bullet" });
   for (const c of profile.certifications) items.push({ roleId: "certifications", roleLabel: "Certifications", field: "cert", text: c, kind: "skills" });
 
   const terms = new Map<string, Set<string>>();

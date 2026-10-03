@@ -10,12 +10,15 @@ import { coverDocxBlob, coverLetterPdf, reportPdf, resumeDocxBlob, resumePdf } f
 import { extractBrowser } from "./extract";
 import { packName } from "../src/lib/export/names";
 import { auditProse } from "../src/lib/truth/truth";
+import { acceptSafeItems, applyMerge, mergeResumes, type MergeItem, type MergeReport } from "../src/lib/merge/merge";
+import { buildDeck, deckBuffer } from "../src/lib/deck/deck";
 import { buildIndex } from "../src/lib/profile-index";
 
 declare const claude: any;
 const KEY = "sco.v1";
-type Store = { profile: Profile | null; apps: AppRecord[] };
-const load = (): Store => { try { const s = JSON.parse(localStorage.getItem(KEY) || ""); return { profile: s.profile ? ProfileSchema.parse(s.profile) : null, apps: s.apps ?? [] }; } catch { return { profile: null, apps: [] }; } };
+type Resume = { id: string; name: string; addedAt: string; profile: Profile };
+type Store = { profile: Profile | null; apps: AppRecord[]; resumes: Resume[] };
+const load = (): Store => { try { const s = JSON.parse(localStorage.getItem(KEY) || ""); return { profile: s.profile ? ProfileSchema.parse(s.profile) : null, apps: s.apps ?? [], resumes: (s.resumes ?? []).map((r: Resume) => ({ ...r, profile: ProfileSchema.parse(r.profile) })) }; } catch { return { profile: null, apps: [], resumes: [] }; } };
 let persistWarned = false;
 const persist = (s: Store) => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { if (!persistWarned) { persistWarned = true; } } };
 
@@ -24,7 +27,7 @@ const errCopy = (e: any) => (e?.code === "not_granted" ? "Claude access was decl
 
 function App() {
   const [store, setStore] = useState<Store>(load);
-  const [view, setView] = useState<"profile" | "analyze" | "apps" | "settings">("profile");
+  const [view, setView] = useState<"profile" | "analyze" | "apps" | "deck" | "settings">("profile");
   const [openId, setOpenId] = useState<string | null>(null);
   const [sample, setSample] = useState<any>(null);
   const [downloads, setDownloads] = useState<any>(null);
@@ -49,7 +52,7 @@ function App() {
   const updateApp = (a: AppRecord) => setStore((s) => ({ ...s, apps: s.apps.map((x) => (x.id === a.id ? a : x)) }));
   const open = store.apps.find((a) => a.id === openId) ?? null;
 
-  const nav: [typeof view, string][] = [["profile", "Profile"], ["analyze", "Analyze a job"], ["apps", `Applications (${store.apps.length})`], ["settings", "Settings"]];
+  const nav: [typeof view, string][] = [["profile", "Profile"], ["analyze", "Analyze a job"], ["apps", `Applications (${store.apps.length})`], ["deck", "Presentation"], ["settings", "Settings"]];
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line py-4">
@@ -63,10 +66,11 @@ function App() {
       {busy && <div role="status" className="mb-3 flex items-center justify-between rounded-md border border-line bg-gray-50 p-3 text-sm"><span>{busy}</span>{abort.current && <Button size="sm" variant="outline" onClick={() => abort.current?.abort()}>Stop</Button>}</div>}
       {toast && <div role={toast.tone === "err" ? "alert" : "status"} className={cx("mb-3 rounded-md border p-3 text-sm", toast.tone === "err" ? "border-red-300 bg-red-50 text-red-800" : "border-green-300 bg-green-50 text-green-800")}>{toast.text}</div>}
 
-      {view === "profile" && <ProfileView profile={store.profile} setProfile={setProfile} provider={provider} run={run} say={say} claudeOn={!!transport} goAnalyze={() => setView("analyze")} />}
+      {view === "profile" && <ProfileView profile={store.profile} setProfile={setProfile} resumes={store.resumes} setResumes={(f: (r: Resume[]) => Resume[]) => setStore((s) => ({ ...s, resumes: f(s.resumes) }))} provider={provider} run={run} say={say} claudeOn={!!transport} goAnalyze={() => setView("analyze")} />}
       {view === "analyze" && <AnalyzeView profile={store.profile} run={run} say={say} onDone={(a: AppRecord) => { setStore((s) => ({ ...s, apps: [a, ...s.apps] })); setOpenId(a.id); setView("apps"); }} provider={provider} claudeOn={!!transport} />}
       {view === "apps" && !open && <AppsList apps={store.apps} open={setOpenId} />}
       {view === "apps" && open && store.profile && <AppDetail key={open.id} app={open} profile={store.profile} update={updateApp} back={() => setOpenId(null)} remove={() => { setStore((s) => ({ ...s, apps: s.apps.filter((x) => x.id !== open.id) })); setOpenId(null); }} provider={provider} run={run} say={say} downloads={downloads} />}
+      {view === "deck" && <DeckView profile={store.profile} apps={store.apps} downloads={downloads} say={say} />}
       {view === "settings" && <SettingsView store={store} setStore={setStore} downloads={downloads} say={say} claudeOn={!!sample} />}
     </div>
   );
@@ -77,31 +81,66 @@ const csv = (a: string[]) => a.join(", "); const unCsv = (s: string) => s.split(
 const lines = (a: string[]) => a.join("\n"); const unLines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
 const SKILL_LABEL: Record<string, string> = { languages: "HDL / Languages", verification: "Verification", formal: "Formal verification", processor: "Processor / ISA", protocols: "Interfaces / Protocols", domains: "Verification domains", tools: "Tools", methodologies: "Methodologies" };
 
-function ProfileView({ profile, setProfile, provider, run, say, claudeOn, goAnalyze }: any) {
+function ProfileView({ profile, setProfile, resumes, setResumes, provider, run, say, claudeOn, goAnalyze }: any) {
   const file = useRef<HTMLInputElement>(null);
   const [paste, setPaste] = useState("");
-  const [pending, setPending] = useState<Profile | null>(null);
-  async function parse(text: string) {
-    if (text.trim().length < 200) throw new Error("Almost no text found. Use a text-based PDF, DOCX or TXT, or paste the resume text.");
-    const parsed = await provider.analyzeResume(text);
-    if (!parsed.roles.length) say("err", "No roles were detected. Check the text or add experience manually below.");
-    if (profile) { setPending(parsed); say("ok", "Parsed. Your current profile was not changed; apply the parse below to replace it."); } else { setProfile(parsed); say("ok", `Parsed ${parsed.roles.length} roles. Review and correct them below.`); }
-  }
-  const onFile = (f: File) => run(claudeOn ? "Reading resume with Claude…" : "Reading resume…", async () => parse(await extractBrowser(f)));
+  const [report, setReport] = useState<MergeReport | null>(null);
+  const [items, setItems] = useState<MergeItem[]>([]);
+  const addResume = async (name: string, text: string, existing: Resume[]) => {
+    if (text.trim().length < 200) throw new Error(`${name}: almost no text found. Use a text-based PDF, DOCX or TXT, or paste the text.`);
+    const parsed: Profile = await provider.analyzeResume(text);
+    return [...existing, { id: `res${Date.now().toString(36)}${existing.length}`, name, addedAt: new Date().toISOString(), profile: parsed }];
+  };
+  const afterAdd = (all: Resume[]) => {
+    setResumes(() => all);
+    let base = profile;
+    if (!base) { const r = mergeResumes(all.map((x) => ({ id: x.id, name: x.name, profile: x.profile }))); base = r.base; setProfile(base); say("ok", `Created your profile from ${r.analysis.baseName}. ${all.length > 1 ? "Review the merge below to bring in details from your other resumes." : "Review and correct it below."}`); }
+    if (all.length > 1 || profile) { const r = mergeResumes(all.map((x) => ({ id: x.id, name: x.name, profile: x.profile })), base); setReport(r); setItems(r.items); if (profile) say("ok", `${all.length} resume(s) analysed: ${r.items.length} proposed change(s) to review. Nothing is applied until you accept it.`); }
+  };
+  const onFiles = (files: File[]) => run(claudeOn ? "Reading resumes with Claude…" : "Reading resumes…", async () => {
+    let all: Resume[] = resumes;
+    for (const f of files) all = await addResume(f.name, await extractBrowser(f), all);
+    afterAdd(all);
+  });
+  const decide = (id: string, decision: MergeItem["decision"]) => setItems((xs) => xs.map((x) => (x.id === id ? { ...x, decision } : x)));
+  const accepted = items.filter((i) => i.decision === "accepted").length;
+  const groups = useMemo(() => { const m = new Map<string, MergeItem[]>(); for (const i of items) m.set(i.group, [...(m.get(i.group) ?? []), i]); return [...m.entries()]; }, [items]);
   return (
     <div className="space-y-4">
       <Card className="space-y-3">
-        <h2 className="text-sm font-semibold">Master resume</h2>
-        <p className="text-sm text-gray-600">Upload a PDF, DOCX or TXT (max 5 MB), or paste text. The file is read inside this page and kept only in this browser. {claudeOn ? "Claude is on: resume text is sent to Claude for parsing." : "Parsing runs locally with the built-in engine."}</p>
+        <h2 className="text-sm font-semibold">Resume library</h2>
+        <p className="text-sm text-gray-600">Upload your current resume and any older ones (PDF, DOCX or TXT, 5 MB each). They are read inside this page and kept only in this browser. {claudeOn ? "Claude is on: resume text is sent to Claude for parsing." : "Parsing runs locally with the built-in engine."} Older resumes are compared against your profile to recover projects, bullets, skills and credentials you may have dropped.</p>
         <div className="flex flex-wrap gap-2">
-          <input ref={file} type="file" id="resume-file" accept=".pdf,.docx,.txt" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} />
-          <Button onClick={() => file.current?.click()}>Upload resume</Button>
-          <Button variant="outline" onClick={() => { if (!profile || window.confirm === undefined) setProfile(parseResumeHeuristic(DEMO_RESUME_TEXT)); else setPending(parseResumeHeuristic(DEMO_RESUME_TEXT)); say("ok", "Fictional demo profile ready."); }}>Load demo profile</Button>
+          <input ref={file} type="file" id="resume-file" multiple accept=".pdf,.docx,.txt" className="hidden" onChange={(e) => { const fs = [...(e.target.files ?? [])]; if (fs.length) onFiles(fs); e.target.value = ""; }} />
+          <Button onClick={() => file.current?.click()}>Upload resumes</Button>
+          <Button variant="outline" onClick={() => { setProfile(parseResumeHeuristic(DEMO_RESUME_TEXT)); say("ok", "Fictional demo profile ready."); }}>Load demo profile</Button>
+          {resumes.length > 0 && profile && <Button variant="outline" onClick={() => { const r = mergeResumes(resumes.map((x: Resume) => ({ id: x.id, name: x.name, profile: x.profile })), profile); setReport(r); setItems(r.items); }}>Re-analyse library against profile</Button>}
         </div>
-        <details><summary className="cursor-pointer text-sm underline">Paste resume text instead</summary><Textarea id="resume-paste" rows={8} className="mt-2" value={paste} onChange={(e) => setPaste(e.target.value)} /><Button className="mt-2" variant="outline" disabled={paste.length < 50} onClick={() => run("Parsing…", () => parse(paste))}>Parse pasted text</Button></details>
-        {pending && <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">New parse: {pending.roles.length} roles, {pending.education.length} education entries. <Button size="sm" className="ml-2" onClick={() => { setProfile(pending); setPending(null); }}>Replace my profile with this</Button> <Button size="sm" variant="ghost" onClick={() => setPending(null)}>Discard</Button></div>}
+        <details><summary className="cursor-pointer text-sm underline">Paste resume text instead</summary><Textarea id="resume-paste" rows={8} className="mt-2" value={paste} onChange={(e) => setPaste(e.target.value)} /><Button className="mt-2" variant="outline" disabled={paste.length < 50} onClick={() => run("Parsing…", async () => { afterAdd(await addResume(`pasted-${resumes.length + 1}.txt`, paste, resumes)); setPaste(""); })}>Add pasted resume</Button></details>
+        {resumes.length > 0 && <ul className="divide-y divide-line rounded-md border border-line text-sm">{resumes.map((r: Resume) => <li key={r.id} className="flex items-center justify-between gap-2 p-2"><span><b>{r.name}</b> <span className="text-gray-500">· {r.profile.roles.length} roles, {r.profile.roles.reduce((a, x) => a + x.responsibilities.length + x.achievements.length, 0)} bullets · {r.profile.roles[0]?.title ?? "no roles found"}</span></span><button className="text-xs text-red-800 underline" onClick={() => setResumes((xs: Resume[]) => xs.filter((x) => x.id !== r.id))}>Remove</button></li>)}</ul>}
       </Card>
-      {profile ? <ProfileEditor profile={profile} setProfile={setProfile} say={say} goAnalyze={goAnalyze} /> : <Card className="text-sm text-gray-600">No profile yet. Upload a resume or load the demo profile to begin.</Card>}
+
+      {report && (
+        <Card className="space-y-4" id="merge-review">
+          <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">Merge review <span className="font-normal text-gray-500">· base: {report.analysis.baseName}</span></h2>
+            <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setItems(acceptSafeItems(items))}>Accept all additions</Button><Button size="sm" disabled={!accepted} onClick={() => { setProfile(applyMerge(profile, items)); setReport(null); setItems([]); say("ok", `Applied ${accepted} change(s) to your profile.`); }}>Apply {accepted} accepted</Button><Button size="sm" variant="ghost" onClick={() => { setReport(null); setItems([]); }}>Close</Button></div></div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div><Label>Sources</Label><ul className="text-sm">{report.analysis.sources.map((s) => <li key={s.name}>{s.name}: {s.roles} roles, {s.bullets} bullets, {s.years} yrs</li>)}</ul></div>
+            <div><Label>Timeline gaps over 3 months</Label>{report.analysis.gaps.length ? <ul className="text-sm">{report.analysis.gaps.map((g, i) => <li key={i}>{g.from} → {g.to} ({g.months} months)</li>)}</ul> : <p className="text-sm text-gray-500">None found.</p>}</div>
+            <div><Label>Terms only in older resumes</Label>{report.analysis.onlyInOlder.length ? <div className="flex flex-wrap gap-1">{report.analysis.onlyInOlder.slice(0, 14).map((t) => <Badge key={t} tone="blue">{t}</Badge>)}</div> : <p className="text-sm text-gray-500">None.</p>}</div>
+          </div>
+          {!items.length && <p className="text-sm text-gray-600">Your profile already contains everything in these resumes.</p>}
+          {groups.map(([g, xs]) => <div key={g}><h3 className="mb-1 text-sm font-semibold">{g}</h3><div className="space-y-2">{xs.map((i) => (
+            <div key={i.id} className={cx("rounded-md border p-3", i.kind === "conflict" ? "border-amber-300" : "border-line")}>
+              <div className="mb-1 flex flex-wrap items-center gap-2"><Badge tone={i.kind === "conflict" ? "amber" : i.safe ? "green" : "blue"}>{i.kind === "conflict" ? "conflict" : i.kind === "bullet-detail" ? "more detail" : "new"}</Badge><span className="text-xs text-gray-500">{i.label} · from {i.source}</span><Badge tone={i.decision === "accepted" ? "green" : i.decision === "rejected" ? "gray" : "amber"}>{i.decision}</Badge></div>
+              {i.current && <p className="text-sm"><span className="text-xs uppercase text-gray-500">Current </span>{i.current}</p>}
+              <p className="text-sm"><span className="text-xs uppercase text-gray-500">{i.current ? "Other " : "Add "}</span>{i.proposed}</p>
+              {i.note && <p className="text-xs text-gray-500">{i.note}</p>}
+              <div className="mt-2 flex gap-2"><Button size="sm" onClick={() => decide(i.id, "accepted")}>{i.current ? "Use this" : "Add"}</Button><Button size="sm" variant="outline" onClick={() => decide(i.id, "rejected")}>{i.current ? "Keep current" : "Skip"}</Button></div>
+            </div>))}</div></div>)}
+        </Card>
+      )}
+      {profile ? <ProfileEditor profile={profile} setProfile={setProfile} say={say} goAnalyze={goAnalyze} /> : <Card className="text-sm text-gray-600">No profile yet. Upload resumes or load the demo profile to begin.</Card>}
     </div>
   );
 }
@@ -130,6 +169,17 @@ function ProfileEditor({ profile: p, setProfile, say, goAnalyze }: { profile: Pr
       <Card className="space-y-3"><h3 className="text-sm font-semibold">Education</h3>
         {p.education.map((e, i) => <div key={i} className="grid gap-3 md:grid-cols-4">{(["degree", "university", "specialization", "year"] as const).map((k) => <div key={k}><Label htmlFor={`ed${i}-${k}`}>{k}</Label><Input id={`ed${i}-${k}`} value={e[k]} onChange={(ev) => setProfile({ ...p, education: p.education.map((x, j) => (j === i ? { ...x, [k]: ev.target.value } : x)) })} /></div>)}</div>)}
         <Button variant="outline" size="sm" onClick={() => setProfile({ ...p, education: [...p.education, { degree: "", university: "", specialization: "", year: "" }] })}>+ Add education</Button></Card>
+      <Card className="space-y-3"><h3 className="text-sm font-semibold">Projects <span className="font-normal text-gray-500">(used for the presentation)</span></h3>
+        {p.projects.map((pr, i) => { const setPr = (patch: Partial<typeof pr>) => setProfile({ ...p, projects: p.projects.map((x, j) => (j === i ? { ...x, ...patch } : x)) }); return (
+          <div key={pr.id} className="space-y-2 rounded-md border border-line p-3">
+            <div className="grid gap-3 md:grid-cols-3"><div><Label htmlFor={`pj${i}-n`}>Name</Label><Input id={`pj${i}-n`} value={pr.name} onChange={(e) => setPr({ name: e.target.value })} /></div><div><Label htmlFor={`pj${i}-e`}>Employer / context</Label><Input id={`pj${i}-e`} value={pr.employer} onChange={(e) => setPr({ employer: e.target.value })} /></div><div><Label htmlFor={`pj${i}-p`}>Period</Label><Input id={`pj${i}-p`} value={pr.period} onChange={(e) => setPr({ period: e.target.value })} /></div></div>
+            <div><Label htmlFor={`pj${i}-h`}>Highlights (one per line)</Label><Textarea id={`pj${i}-h`} rows={4} value={lines([pr.summary, ...pr.highlights].filter(Boolean))} onChange={(e) => { const ls = unLines(e.target.value); setPr({ summary: "", highlights: ls }); }} /></div>
+            <div><Label htmlFor={`pj${i}-t`}>Technologies (comma separated)</Label><Input id={`pj${i}-t`} value={csv(pr.technologies)} onChange={(e) => setPr({ technologies: unCsv(e.target.value) })} /></div>
+            <button className="text-xs text-red-800 underline" onClick={() => setProfile({ ...p, projects: p.projects.filter((_, j) => j !== i) })}>Remove project</button>
+          </div>); })}
+        <Button variant="outline" size="sm" onClick={() => setProfile({ ...p, projects: [...p.projects, { id: `pj${Date.now().toString(36)}`, name: "", employer: "", period: "", summary: "", highlights: [], technologies: [] }] })}>+ Add project</Button>
+        <div><Label htmlFor="achv">Key achievements and awards (one per line, real results only)</Label><Textarea id="achv" rows={3} value={lines(p.achievements)} onChange={(e) => setProfile({ ...p, achievements: unLines(e.target.value) })} /></div>
+      </Card>
       <Card className="grid gap-3 md:grid-cols-2"><div><Label htmlFor="certs">Certifications (one per line)</Label><Textarea id="certs" rows={3} value={lines(p.certifications)} onChange={(e) => setProfile({ ...p, certifications: unLines(e.target.value) })} /></div><div><Label htmlFor="pubs">Publications / patents (one per line)</Label><Textarea id="pubs" rows={3} value={lines(p.publications)} onChange={(e) => setProfile({ ...p, publications: unLines(e.target.value) })} /></div></Card>
     </div>
   );
@@ -446,6 +496,36 @@ function OutreachTab({ a, profile, update, provider, run, say }: any) {
   );
 }
 
+
+/* ---------- Presentation ---------- */
+function DeckView({ profile, apps, downloads, say }: { profile: Profile | null; apps: AppRecord[]; downloads: any; say: any }) {
+  const [focus, setFocus] = useState("");
+  const [max, setMax] = useState("6");
+  const [inc, setInc] = useState({ snapshot: true, timeline: true, projects: true, achievements: true, leadership: true, toolbox: true, education: true, closing: true });
+  const [busy, setBusy] = useState(false);
+  const app = apps.find((a) => a.id === focus);
+  const deck = useMemo(() => (profile ? buildDeck(profile, { maxProjects: Number(max), include: inc, focus: app ? { jd: app.jd, match: app.match } : null }) : null), [profile, app, max, inc]);
+  if (!profile || !deck) return <Card className="text-sm text-gray-600">Create your profile first (Profile tab).</Card>;
+  const name = (profile.identity.name || "Candidate").replace(/[^\w]+/g, "");
+  return (
+    <div className="grid gap-4 lg:grid-cols-3">
+      <Card className="space-y-3 lg:col-span-1">
+        <h2 className="text-sm font-semibold">Projects and achievements deck</h2>
+        <p className="text-sm text-gray-600">A .pptx built only from your profile: your own bullets (trimmed, never reworded), your real metrics, your tools. Nothing is invented.</p>
+        <div><Label htmlFor="d-focus">Tailor to a job (optional)</Label><Select id="d-focus" value={focus} onChange={(e) => setFocus(e.target.value)}><option value="">General</option>{apps.map((a) => <option key={a.id} value={a.id}>{a.roleTitle || "Untitled"} · {a.company || "?"}</option>)}</Select></div>
+        <div><Label htmlFor="d-max">Project slides</Label><Select id="d-max" value={max} onChange={(e) => setMax(e.target.value)}>{["3", "4", "6", "8", "12"].map((v) => <option key={v}>{v}</option>)}</Select></div>
+        <fieldset className="grid grid-cols-2 gap-1 text-sm"><legend className="mb-1 text-xs font-medium uppercase text-gray-500">Include</legend>{Object.keys(inc).map((k) => <label key={k} className="flex items-center gap-2"><input type="checkbox" id={`inc-${k}`} checked={(inc as any)[k]} onChange={(e) => setInc({ ...inc, [k]: e.target.checked })} />{k}</label>)}</fieldset>
+        <Button disabled={busy || !downloads} onClick={async () => { setBusy(true); try { const buf: ArrayBuffer = await deckBuffer(deck, "arraybuffer"); await downloads.save({ filename: `${name}_Projects_Achievements.pptx`, data: buf }); say("ok", "Presentation saved."); } catch (e: any) { if (e?.code !== "declined") say("err", `Could not save: ${e?.message ?? e?.code ?? e}`); } finally { setBusy(false); } }}>Download .pptx</Button>
+        {!downloads && <p className="text-xs text-gray-500">File saving is only available when this page runs inside Claude.</p>}
+        {deck.warnings.map((w, i) => <p key={i} role="status" className="rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800">{w}</p>)}
+      </Card>
+      <div className="space-y-2 lg:col-span-2"><h3 className="text-sm font-semibold">{deck.slides.length} slides</h3>
+        {deck.slides.map((s, i) => <Card key={i} className="p-3"><div className="flex items-baseline gap-3"><span className="font-mono text-xs text-gray-500">{String(i + 1).padStart(2, "0")}</span><b className="text-sm">{s.title}</b><Badge>{s.kind}</Badge></div>{s.lines.filter((l) => !l.startsWith("tag: ")).length > 0 && <ul className="mt-1 text-sm text-gray-700">{s.lines.filter((l) => !l.startsWith("tag: ")).slice(0, 5).map((l, j) => <li key={j}>{l}</li>)}</ul>}{s.lines.some((l) => l.startsWith("tag: ")) && <div className="mt-1 flex flex-wrap gap-1">{s.lines.filter((l) => l.startsWith("tag: ")).map((l) => <Badge key={l} tone="blue">{l.slice(5)}</Badge>)}</div>}</Card>)}
+      </div>
+    </div>
+  );
+}
+
 /* ---------- Settings ---------- */
 function SettingsView({ store, setStore, downloads, say, claudeOn }: any) {
   const file = useRef<HTMLInputElement>(null);
@@ -455,10 +535,10 @@ function SettingsView({ store, setStore, downloads, say, claudeOn }: any) {
       <Card className="space-y-2 text-sm"><h3 className="font-semibold">Where your data lives</h3><p>Profile, resume text and applications are stored in <b>this browser only</b> (local storage for this artifact). They are not sent anywhere unless you switch on “Use Claude”, which sends the relevant text to Claude on your own account. Clearing site data or using another device starts empty, so keep a backup.</p><p>AI: <Badge tone={claudeOn ? "green" : "amber"}>{claudeOn ? "Claude available" : "offline engine only"}</Badge></p></Card>
       <Card className="space-y-3"><h3 className="text-sm font-semibold">Backup</h3>
         <div className="flex flex-wrap gap-2"><Button variant="outline" disabled={!downloads} onClick={() => save(downloads, "career-optimizer-backup.json", JSON.stringify(store, null, 1) as any, say)}>Export backup (JSON)</Button>
-          <input ref={file} id="restore" type="file" accept=".json" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; try { const s = JSON.parse(await f.text()); setStore({ profile: s.profile ? ProfileSchema.parse(s.profile) : null, apps: Array.isArray(s.apps) ? s.apps : [] }); say("ok", "Backup restored."); } catch { say("err", "That file is not a valid backup."); } e.target.value = ""; }} />
+          <input ref={file} id="restore" type="file" accept=".json" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; try { const s = JSON.parse(await f.text()); setStore({ profile: s.profile ? ProfileSchema.parse(s.profile) : null, apps: Array.isArray(s.apps) ? s.apps : [], resumes: Array.isArray(s.resumes) ? s.resumes.map((r: Resume) => ({ ...r, profile: ProfileSchema.parse(r.profile) })) : [] }); say("ok", "Backup restored."); } catch { say("err", "That file is not a valid backup."); } e.target.value = ""; }} />
           <Button variant="outline" onClick={() => file.current?.click()}>Restore backup</Button></div></Card>
-      <Card className="space-y-3"><h3 className="text-sm font-semibold text-red-700">Delete data</h3><p className="text-sm text-gray-600">Removes your profile and every application from this browser.</p>
-        {confirm ? <div className="flex gap-2"><Button variant="danger" onClick={() => { setStore({ profile: null, apps: [] }); try { localStorage.removeItem(KEY); } catch { /* ignore */ } setConfirm(false); say("ok", "All data deleted."); }}>Yes, delete everything</Button><Button variant="ghost" onClick={() => setConfirm(false)}>Cancel</Button></div> : <Button variant="danger" onClick={() => setConfirm(true)}>Delete all my data</Button>}</Card>
+      <Card className="space-y-3"><h3 className="text-sm font-semibold text-red-700">Delete data</h3><p className="text-sm text-gray-600">Removes your profile, uploaded resumes and every application from this browser.</p>
+        {confirm ? <div className="flex gap-2"><Button variant="danger" onClick={() => { setStore({ profile: null, apps: [], resumes: [] }); try { localStorage.removeItem(KEY); } catch { /* ignore */ } setConfirm(false); say("ok", "All data deleted."); }}>Yes, delete everything</Button><Button variant="ghost" onClick={() => setConfirm(false)}>Cancel</Button></div> : <Button variant="danger" onClick={() => setConfirm(true)}>Delete all my data</Button>}</Card>
     </div>
   );
 }

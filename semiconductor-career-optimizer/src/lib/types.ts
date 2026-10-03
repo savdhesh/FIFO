@@ -24,6 +24,17 @@ export const RoleSchema = z.object({
 });
 export type Role = z.infer<typeof RoleSchema>;
 
+export const ProjectSchema = z.object({
+  id: z.string(),
+  name: z.string().default(""),
+  employer: z.string().default(""), // employer/context, optional
+  period: z.string().default(""),
+  summary: z.string().default(""),
+  highlights: z.array(z.string()).default([]),
+  technologies: z.array(z.string()).default([]),
+});
+export type Project = z.infer<typeof ProjectSchema>;
+
 export const SKILL_CATEGORIES = [
   "languages", "verification", "formal", "processor", "protocols", "domains", "tools", "methodologies",
 ] as const;
@@ -49,6 +60,8 @@ export const ProfileSchema = z.object({
   }).default({}),
   certifications: z.array(z.string()).default([]),
   publications: z.array(z.string()).default([]),
+  projects: z.array(ProjectSchema).default([]),
+  achievements: z.array(z.string()).default([]), // resume-level key achievements / awards, verbatim
 });
 export type Profile = z.infer<typeof ProfileSchema>;
 
