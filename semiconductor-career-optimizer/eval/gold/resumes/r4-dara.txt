@@ -1,0 +1,22 @@
+Dara Fictional
+Stuttgart, Germany | dara.fictional@example.com | +49 160 0000000
+
+Professional Experience
+
+Functional Safety Verification Engineer, Albatross Automotive GmbH (2019 – present)
+* Planned and ran fault injection campaigns for an ASIL-D brake controller SoC.
+* Verified lockstep cores, ECC on SRAM and watchdog safety mechanisms in UVM.
+* Produced diagnostic coverage reports feeding the FMEDA.
+
+Verification Engineer, Pelican Elektronik AG (2015 – 2019)
+* Developed UVM testbenches for CAN FD and LIN controllers.
+* Wrote SVA for clock and reset sequencing.
+
+Education
+Dipl.-Ing. Electrical Engineering, Example Technical University Stuttgart, 2015
+
+Key Skills
+SystemVerilog, UVM, SVA, ISO 26262, fault injection, FMEDA, CAN FD, LIN, Xcelium
+
+Languages
+German (native), English (fluent)

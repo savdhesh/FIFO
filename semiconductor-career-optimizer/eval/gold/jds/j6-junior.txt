@@ -1,0 +1,17 @@
+Design Verification Engineer
+Initech India Pvt Ltd | Bengaluru
+
+Job Description:
+We are hiring a Design Verification Engineer with 2-4 years of experience.
+
+Must have:
+1. Good knowledge of SystemVerilog and UVM methodology
+2. Experience verifying AMBA protocols such as APB, AHB or AXI
+3. Exposure to simulators like Xcelium or VCS
+4. Scripting in Python or Perl
+
+Good to have:
+1. Knowledge of I2C, SPI or UART
+2. Functional coverage and assertions (SVA)
+
+Notice period: immediate joiners preferred.

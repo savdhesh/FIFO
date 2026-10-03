@@ -1,0 +1,21 @@
+Principal CPU Verification Engineer (RISC-V)
+Acme Cores Ltd, Cambridge, UK
+
+We are building a high-performance out-of-order RISC-V application core.
+
+Responsibilities
+• Define the verification strategy and plan for the core and lead its execution.
+• Build ISS co-simulation (Spike/Sail) with instruction-retirement comparison.
+• Drive coverage closure across the LSU, MMU and pipeline.
+
+Required
+• 12+ years of CPU or processor verification experience
+• Deep knowledge of the RISC-V privileged architecture, CSRs, interrupts and exceptions
+• Experience with random instruction generators (e.g. riscv-dv)
+• Strong SystemVerilog/UVM and C/C++
+• Technical leadership of a verification team
+
+Desirable
+• Memory consistency / memory model verification
+• Formal verification of processor control logic
+• Vector extension (RVV) experience

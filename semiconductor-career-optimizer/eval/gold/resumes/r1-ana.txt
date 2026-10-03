@@ -1,0 +1,24 @@
+ANA FICTIONAL
+Senior Design Verification Engineer
+San Jose, CA · ana.fictional@example.com · (408) 555-0142 · linkedin.com/in/ana-fictional-demo
+
+Summary
+Design verification engineer with 9 years on PCIe and CXL controllers, UVM environments and coverage closure.
+
+Professional Experience
+
+Senior Design Verification Engineer — Vandelay Silicon, San Jose, CA | 04/2020–Present
+▸ Owned the UVM environment for a PCIe Gen5 endpoint controller, including the LTSSM and TLP layers.
+▸ Built CXL.io and CXL.mem traffic sequences and a scoreboard for ordering rules.
+▸ Closed functional coverage for link training and error injection scenarios.
+▸ Debugged regression failures with Verdi and VCS; triaged nightly failures.
+
+Design Verification Engineer — Pied Piper Microsystems, Austin, TX | 06/2016–03/2020
+▸ Developed SystemVerilog assertions for AXI4 bridges.
+▸ Wrote constrained-random sequences and covergroups for a DMA engine.
+▸ Automated regression launch and reporting with Python.
+
+Education
+B.S. Electrical Engineering, Example State University, 2016
+
+Skills: SystemVerilog, UVM, SVA, Python, PCIe, CXL, AXI4, VCS, Verdi, Git

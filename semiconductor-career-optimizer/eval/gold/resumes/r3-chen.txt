@@ -1,0 +1,18 @@
+Chen Fictional
+Singapore · chen.fictional@example.com
+
+EXPERIENCE
+Period | Company | Position
+2019 – Present | Kestrel Chips Pte Ltd | Staff Verification Engineer
+• Built a coverage-closure dashboard in Python that ranks tests by incremental coverage.
+• Trained a gradient-boosted model to predict which regression tests will fail, reducing nightly runs by 35%.
+• Owned the UVM environment for an NPU subsystem with AXI and CHI interfaces.
+2014 – 2019 | Heron Microelectronics | Senior Verification Engineer
+• Developed scoreboards and reference models in C++ for a DSP block.
+• Ran regressions on VCS with LSF.
+
+EDUCATION
+M.Sc. Computer Engineering, Example University Singapore, 2014
+
+SKILLS
+SystemVerilog, UVM, Python, C++, machine learning, AXI, CHI, VCS, LSF

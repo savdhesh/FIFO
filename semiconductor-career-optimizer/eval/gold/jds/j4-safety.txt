@@ -1,0 +1,16 @@
+Verification Engineer – Functional Safety (m/f/d)
+Bosch-like Automotive Fictional GmbH, Stuttgart
+
+Your tasks
+Verification of safety mechanisms in automotive microcontrollers according to ISO 26262 up to ASIL-D. Planning and execution of fault injection campaigns and support of safety analyses (FMEDA).
+
+Your profile
+- Degree in electrical engineering or comparable
+- At least 5 years of experience in digital verification with SystemVerilog and UVM
+- Sound knowledge of ISO 26262 and safety mechanisms such as lockstep, ECC and watchdogs
+- Experience with fault injection tools and diagnostic coverage
+- Good German and English skills
+
+Nice to have: CAN FD or Automotive Ethernet, Python.
+
+We offer flexible working hours and a company pension scheme.

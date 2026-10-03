@@ -1,0 +1,33 @@
+Fay Fictional
+Cambridge, UK · fay.fictional@example.com · +44 7700 900000
+
+PROFILE
+Verification lead with 12 years in SoC and subsystem verification.
+
+CAREER HISTORY
+
+Lead Verification Engineer
+Example Ltd, Cambridge
+Oct 2015 – Jun 2020
+- Led a team of 5 engineers verifying an Arm-based mobile SoC.
+- Defined the SoC verification plan and coverage strategy.
+- Brought up firmware-driven tests on Palladium emulation.
+- Verified AXI and CHI interconnect integration.
+
+Verification Engineer
+Sample Systems Ltd, Bristol
+Sep 2008 – Sep 2015
+- Developed UVM agents for AHB and APB peripherals.
+
+Engineering Manager
+Example Ltd, Cambridge
+Jul 2020 – Present
+- Manage 9 verification engineers across two sites; own hiring and performance reviews.
+- Run sign-off reviews for tape-out.
+
+SELECTED PROJECTS
+Mobile SoC Gen2 | Example Ltd | 2019
+- Coordinated subsystem verification across three teams for tape-out.
+
+EDUCATION
+MEng Electronic Engineering, Example University, 2008

@@ -1,0 +1,13 @@
+Senior Physical Design Engineer
+Hooli Silicon — Santa Clara, CA
+
+Requirements
+- 6+ years of physical design experience from RTL-to-GDSII
+- Floorplanning, placement, clock tree synthesis and routing with Cadence Innovus or Synopsys ICC2
+- Static timing analysis and timing closure with PrimeTime
+- Physical verification (DRC/LVS) with Calibre
+- Tcl scripting
+
+Preferred
+- Experience with advanced nodes (5nm and below)
+- Low-power implementation with UPF
