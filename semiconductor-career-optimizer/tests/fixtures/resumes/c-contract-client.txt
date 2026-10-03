@@ -1,0 +1,19 @@
+Sam Fictional
+Singapore
+sam.f@example.com | +65 8000 0000
+
+Experience
+DV Consultant (Contract) | Freelance | Singapore | Feb 2021 – Present
+Client: Acme Fabless Co.
+- Built UVM testbench for a PCIe Gen4 endpoint; owned verification plan and coverage.
+- Formal property checking with JasperGold on arbiter logic.
+Acting as customer-facing technical lead for weekly reviews.
+
+Senior Verification Engineer | Hooli Semiconductor, Singapore | Aug 2015 - Jan 2021
+- Developed SystemVerilog assertions for AXI bridges.
+- Mentored 3 junior engineers.
+
+Education
+B.Eng Electronic Engineering, Example University Singapore, 2015
+Certifications
+Cadence Certified Jasper Gold User (2019)

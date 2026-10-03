@@ -2,12 +2,12 @@ import { ProfileSchema, type Profile, type Role, type SkillCategory } from "../t
 import { ontology } from "../ontology/ontology";
 import { DATE_RANGE_RE } from "./dates";
 
-const BULLET_RE = /^\s*(?:[•●▪■◦○·*\-–—>]|\d+[.)])\s+/;
+const BULLET_RE = /^\s*(?:[•●▪■◦○·*\-–—>\uF000-\uF0FF]|\d+[.)]|o(?=\s+[A-Z]))\s+/;
 const SECTION_PATTERNS: [string, RegExp][] = [
   ["summary", /^(?:professional\s+)?(?:summary|profile|objective|about(?:\s+me)?|executive summary)$/i],
-  ["experience", /^(?:professional\s+|work\s+|relevant\s+)?(?:experience|employment(?:\s+history)?|work history|career history)$/i],
+  ["experience", /^(?:professional\s+|work\s+|relevant\s+|industry\s+)?(?:experience|employment(?:\s+history)?|work history|career history|professional background)$/i],
   ["education", /^(?:education|academic(?:s| background| qualifications)?|qualifications)$/i],
-  ["skills", /^(?:(?:technical|core|key)\s+)?(?:skills|competencies|expertise|skills\s*(?:&|and)\s*tools)(?:\s+summary)?$/i],
+  ["skills", /^(?:(?:technical|core|key)\s+)?(?:skills|competencies|expertise|proficiency|skills\s*(?:&|and)\s*tools|tools\s*(?:&|and)\s*technologies)(?:\s+summary)?$/i],
   ["projects", /^(?:(?:major|key|technical|selected)\s+)?projects$/i],
   ["certifications", /^(?:certifications?|licenses?(?:\s*&\s*certifications?)?|courses|training)$/i],
   ["publications", /^(?:publications?|patents?|papers|patents?\s*(?:&|and)\s*publications?)$/i],
@@ -48,12 +48,20 @@ function parseIdentity(head: string[], whole: string): Profile["identity"] {
   const github = whole.match(/(?:https?:\/\/)?github\.com\/[\w\-]+/i)?.[0] ?? "";
   const portfolio = whole.match(/https?:\/\/(?!(?:www\.)?(?:linkedin|github)\.)[^\s,;)]+/i)?.[0] ?? "";
   const lines = head.map((l) => l.trim()).filter(Boolean).slice(0, 8);
-  const name = lines.find((l) => !/@|https?:|linkedin|github|\d{5,}/i.test(l) && l.split(/\s+/).length <= 5 && /^[\p{L}][\p{L}.'\- ]+$/u.test(l)) ?? "";
+  const nameOk = (l: string) => !/@|https?:|linkedin|github|\d{3,}/i.test(l) && l.split(/\s+/).length <= 5 && /^[\p{L}][\p{L}.'\- ]+$/u.test(l) && !TITLE_RE.test(l);
+  let name = "";
+  for (const l of lines) {
+    // "Jordan Fictional — Verification Architect" / "Name | Title": the name is the first segment.
+    const first = l.split(/\s+[|–—•·-]\s+|\s*[|•·]\s*/)[0].trim();
+    if (nameOk(first)) { name = first; break; }
+  }
   let location = "";
   for (const l of lines) {
-    for (const part of l.split(/[|•·]/)) {
-      const p = part.trim();
-      if (/^[\p{L} .]+,\s*[\p{L} .]+$/u.test(p) && LOCATION_HINT.test(p) && !TITLE_RE.test(p)) { location = p; break; }
+    for (const part of l.split(/\s+[|•·]\s+|\s{2,}|[|•·]/)) {
+      const p = part.trim().replace(/\s+\d{4,6}(?:-\d{4})?$/, ""); // drop ZIP / postcode
+      const segs = p.split(",").map((x) => x.trim());
+      if (segs.length >= 2 && segs.length <= 3 && segs.every((x) => /^[\p{L} .'-]{2,30}$/u.test(x)) && (LOCATION_HINT.test(p) || segs.length === 3) && !TITLE_RE.test(p) && !/@|\d/.test(p)) { location = p; break; }
+      if (!location && /^[\p{L} .'-]{3,30}$/u.test(p) && LOCATION_HINT.test(p) && !TITLE_RE.test(p) && p !== name) { location = p; break; }
     }
     if (location) break;
   }
@@ -63,7 +71,7 @@ function parseIdentity(head: string[], whole: string): Profile["identity"] {
 function stripDate(line: string) {
   const m = line.match(DATE_RANGE_RE);
   if (!m) return { rest: line, start: "", end: "" };
-  const rest = line.replace(m[0], " ").replace(/[()|,–—-]\s*$/g, "").replace(/\s+/g, " ").trim();
+  const rest = line.replace(m[0], " ").replace(/\(\s*\)|\[\s*\]/g, " ").replace(/[(|,–—\-\s]+$/g, "").replace(/^[|,–—\-\s]+/, "").replace(/\s+/g, " ").trim();
   return { rest, start: m[1].trim(), end: /present|current|now|till|to date|ongoing/i.test(m[2]) ? "Present" : m[2].trim() };
 }
 
@@ -71,15 +79,19 @@ function splitHeader(parts: string[]) {
   let title = "", employer = "", location = "", employmentType = "";
   const rest: string[] = [];
   for (const raw of parts) {
-    const p = raw.replace(/^[\s,|–—-]+|[\s,|–—-]+$/g, "");
+    let p = raw.replace(/^[\s,|–—-]+|[\s,|–—-]+$/g, "");
     if (!p) continue;
-    const et = p.match(EMPLOYMENT_TYPE_RE);
-    if (et && p.length < 25) { employmentType = et[0]; continue; }
-    rest.push(p);
+    // Pure employment-type token ("Contract", "Full-time") or a parenthesised one inside a title ("DV Consultant (Contract)").
+    const whole = p.match(/^\(?\s*(full[- ]time|part[- ]time|contract(?:or)?|freelance|intern(?:ship)?|permanent)\s*\)?$/i);
+    if (whole) { employmentType = whole[1]; continue; }
+    const paren = p.match(/\(\s*(full[- ]time|part[- ]time|contract(?:or)?|freelance|permanent)\s*\)/i);
+    if (paren) { employmentType = paren[1]; p = p.replace(paren[0], "").replace(/\s+/g, " ").trim(); }
+    p = p.replace(/\(\s*$/, "").trim();
+    if (p) rest.push(p);
   }
   for (const p of rest) {
     const isLoc = LOCATION_HINT.test(p) && p.length < 40 && p.split(/\s+/).length <= 3 && !TITLE_RE.test(p);
-    if (!title && TITLE_RE.test(p)) title = p;
+    if (!title && TITLE_RE.test(p) && !/\b(ltd|inc|corp|gmbh|pvt|llc|sdn|bhd|technologies|semiconductors?|systems|microsystems|devices|electronics|chips|silicon)\b/i.test(p)) title = p;
     else if (isLoc) location = location ? `${location}, ${p}` : p;
     else if (!employer) employer = p;
   }
@@ -106,9 +118,30 @@ function categorize(text: string, role: Pick<Role, "technologies" | "tools" | "p
 function parseRoles(lines: string[]): Role[] {
   const roles: Role[] = [];
   let cur: { header: string[]; start: string; end: string; body: string[] } | null = null;
+  let prev: Role | null = null;
   const flush = () => {
     if (!cur) return;
     const hdr = splitHeader(cur.header);
+    // Header continuation: short non-bullet lines right after the date line (employer / client / location).
+    let client = "";
+    while (cur.body.length) {
+      const t = cur.body[0].trim();
+      if (!t) { cur.body.shift(); continue; }
+      const cl = t.match(/^(?:client|customer|end customer|project)\s*[:\-–]\s*(.+)$/i);
+      if (cl && !BULLET_RE.test(cur.body[0])) { client = cl[1].trim(); cur.body.shift(); continue; }
+      if (!BULLET_RE.test(cur.body[0]) && t.length < 80 && !/[.;:]$/.test(t) && (!hdr.employer || !hdr.title || !hdr.location) && !/^[a-z]/.test(t) && t.split(/\s+/).length <= 9) {
+        const more = splitHeader(t.split(/\s*[|•·]\s*|\s+[–—]\s+|,\s+(?=[A-Z])/));
+        if (!hdr.title && more.title) hdr.title = more.title;
+        else if (!hdr.employer && more.employer) hdr.employer = more.employer;
+        else if (!more.location) break;
+        if (!hdr.location && more.location) hdr.location = more.location;
+        if (!hdr.employmentType && more.employmentType) hdr.employmentType = more.employmentType;
+        cur.body.shift(); continue;
+      }
+      break;
+    }
+    // Promotions at one employer: a title-only header inherits employer/location from the previous role.
+    if (!hdr.employer && hdr.title && prev) { hdr.employer = prev.employer; if (!hdr.location) hdr.location = prev.location; }
     const items: string[] = [];
     for (const l of cur.body) {
       const t = l.trim();
@@ -119,7 +152,7 @@ function parseRoles(lines: string[]): Role[] {
       else items.push(t);
     }
     const role: Role = {
-      id: uid(), employer: hdr.employer, client: "", title: hdr.title, location: hdr.location,
+      id: uid(), employer: hdr.employer, client, title: hdr.title, location: hdr.location,
       startDate: cur.start, endDate: cur.end, employmentType: hdr.employmentType,
       responsibilities: [], achievements: [], technologies: [], methodologies: [], protocols: [], tools: [],
       leadership: "", teamSize: "", technicalOwnership: "", architectureOwnership: "", customerFacing: "",
@@ -132,7 +165,7 @@ function parseRoles(lines: string[]): Role[] {
     role.architectureOwnership = items.find((i) => ARCH_RE.test(i) && /architect|methodology|framework|strategy|reusable/i.test(i)) ?? "";
     role.technicalOwnership = items.find((i) => /\b(owned|ownership|responsible for|end-to-end)\b/i.test(i)) ?? "";
     role.customerFacing = items.find((i) => CUST_RE.test(i)) ?? "";
-    roles.push(role);
+    roles.push(role); prev = role;
   };
   const lead: string[] = []; // non-bullet lines seen before the first dated header
   const HDR_SPLIT = /\s*[|•·]\s*|\s+[–—]\s+|\s+@\s+|\s+at\s+|,\s+(?=[A-Z])/;
@@ -195,22 +228,23 @@ function parseSkills(lines: string[], whole: string): Profile["skills"] {
   }
   if (!Object.values(out).some((a) => a.length)) {
     // No skills section: fall back to ontology terms found anywhere (stored with canonical names).
-    for (const h of ontology.findTerms(whole)) { const c = catOf(h.canonical); if (c) add(c, h.canonical); }
+    const SOFT = new Set(["Leadership", "Management", "Soft", "Architecture", "Customer", "AI"]);
+    for (const h of ontology.findTerms(whole)) { const e = ontology.get(h.canonical)!; if (SOFT.has(e.category) || e.type === "planning" || e.type === "debugging") continue; const c = catOf(h.canonical); if (c) add(c, h.canonical); }
   }
   return out;
 }
 
 function parseEducation(lines: string[]) {
   const out: Profile["education"] = [];
-  const DEG = /\b(b\.?\s?e\.?|b\.?\s?tech|m\.?\s?tech|b\.?\s?sc|m\.?\s?sc|b\.?\s?s\.?|m\.?\s?s\.?|ph\.?d|bachelor|master|diploma|mba)\b/i;
+  const DEG = /\b(b\.?\s?e\.?|b\.?\s?eng|m\.?\s?eng|b\.?\s?tech|m\.?\s?tech|b\.?\s?sc|m\.?\s?sc|b\.?\s?s\.?|m\.?\s?s\.?|ph\.?d|bachelor|master|diploma|mba)\b/i;
   for (const raw of lines) {
     const l = raw.replace(BULLET_RE, "").trim();
     if (!l) continue;
     const year = l.match(/(?:19|20)\d{2}(?!.*(?:19|20)\d{2})/)?.[0] ?? "";
     if (DEG.test(l) || /universit|institute|college|school/i.test(l)) {
-      const parts = l.split(/\s*[|,–—]\s*/).filter(Boolean);
+      const parts = l.split(/\s*[|,–—]\s*|\s+-\s+/).filter(Boolean);
       const degree = parts.find((p) => DEG.test(p)) ?? "";
-      const university = parts.find((p) => /universit|institute|college|school/i.test(p)) ?? "";
+      const university = (parts.find((p) => /universit|institute|college|school/i.test(p)) ?? "").replace(/\s*\(\s*(?:19|20)\d{2}\s*\)\s*$/, "").trim();
       const last = out[out.length - 1];
       if (last && !last.degree && degree && !university) { last.degree = degree; last.year ||= year; continue; }
       if (last && !last.university && university && !degree) { last.university = university; last.year ||= year; continue; }
