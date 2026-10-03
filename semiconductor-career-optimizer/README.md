@@ -7,6 +7,9 @@ Truth-protected resume tailoring, job-match analysis and cover-letter generation
 ## Audit
 See [AUDIT.md](AUDIT.md): what was tested, 15 defects found and fixed, and a requirement-by-requirement coverage table with what is still partial or unverified.
 
+## Measured accuracy
+`npm run eval` scores the engines against a hand-labelled gold set (6 resumes, 8 JDs, 109 requirement labels, 50 truth claims) with a dev/holdout split. Holdout, never tuned against: parser roles/dates 100%, role employer 50%, JD requirement recall 78%, match-type 88%, overclaim 6%, verdicts 4/4, truth blocked recall 86% with a 5% leak rate (degree claims are not checked yet). Method, numbers and open failures are in [eval/README.md](eval/README.md).
+
 ## ATS check, credibility, strategy, themes, versions
 - **ATS check** (`src/lib/ats`): simulates a text-extracting parser on an uploaded or exported resume (reading order, contact/section/date parsing, columns, icons, tables, font size, images, pages) and shows exactly what was extracted with a Low/Medium/High risk.
 - **Technical credibility** (`src/lib/credibility`): undemonstrated skills, title vs scope, date errors/overlaps/gaps, wrong stated years, missing metrics, weak bullets, filler wording, technology-era anachronisms.
@@ -104,7 +107,7 @@ npm run lint  # tsc --noEmit
 
 ## Known limitations
 - Resume/JD parsing is heuristic (regex + ontology) unless an LLM provider is enabled; unusual layouts (multi-column PDFs, tables) can mis-split roles — that is why the profile editor exists. Scanned/image PDFs are rejected (no OCR).
-- Ontology covers ~115 terms; extend `src/lib/ontology/vocabulary.json` (aliases, `related`, `parent`, `family`, `weak`).
+- Ontology covers 167 terms, with no physical-design vocabulary (measured as the main critical-gap miss in `eval/`); extend `src/lib/ontology/vocabulary.json` (aliases, `related`, `parent`, `family`, `weak`).
 - No automatic bullet rewriting in mock mode (weak bullets are flagged; rewrites need an LLM provider or your own edit). Keyword insertions are proposed only as `INFERRED` changes.
 - ATS parse preview (spec §20), LinkedIn, recruiter messages, interview prediction, analytics beyond the basic dashboard: not built.
 - Country settings change spelling, date format, salutation/closing and default length only; no immigration advice.

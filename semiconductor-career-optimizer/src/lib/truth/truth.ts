@@ -15,10 +15,13 @@ const OWNERSHIP_VERB = /\b(owned|architected|defined|established|drove|spearhead
 const CREDENTIAL = /\b(certified|certification|patents?|patented|awards?|awarded|published|publications?|ieee paper|pmp|best paper|fellowship)\b/i;
 const TITLE_WORD = /\b(principal|staff|distinguished|architect|manager|director|lead|head of|vice president|vp)\b/i;
 const ORG_RE = /\b([A-Z][\w&.-]+(?:\s+[A-Z][\w&.-]+)*\s+(?:Inc\.?|Ltd\.?|LLC|Corp\.?|Corporation|Technologies|Semiconductors?|Systems|Microelectronics|Labs|GmbH|Pvt\.?(?:\s+Ltd\.?)?))/g;
+// "5 SoCs", "5 automotive SoCs", "team of 6 engineers": a count of things, up to two adjectives in between.
+const COUNT_NOUN = "engineers?|members|people|developers|blocks?|ips?|projects?|tape-?outs?|chips?|socs?|asics?|products?|testcases|tests|designs|customers?|reports?|gates?";
+const COUNT_RE = new RegExp(`\\b(?:team of\\s+)?\\d+\\+?\\s+(?:(?!(?:years?|yrs?|months?|in|of|at|on|with|for|and|or|to|across)\\b)[a-z][\\w-]*\\s+){0,2}?(?:${COUNT_NOUN})\\b`, "gi");
 const METRIC_RES: RegExp[] = [
   /\b\d+(?:\.\d+)?\s?%/g,
   /\b\d+(?:\.\d+)?\s?x\b/gi,
-  /\b(?:team of\s+)?\d+\+?\s+(?:engineers?|members|people|developers|blocks?|ips?|projects?|tape-?outs?|chips?|testcases|tests|designs|customers?|reports?|gates?)\b/gi,
+  COUNT_RE,
   /\bteam of \d+\b/gi,
   /\b\d+(?:\.\d+)?\s?(?:k|m|million|billion)\+?\s+(?:gates?|tests?|lines|transactions)\b/gi,
 ];
@@ -71,7 +74,7 @@ export function checkClaim(text: string, ctx: TruthContext): ClaimCheck {
   for (const re of METRIC_RES) for (const m of body.matchAll(re)) {
     const raw = m[0].trim();
     const num = digits(raw);
-    if (!numberPresent(allDigitsText, num.split(",")[0])) {
+    if (!numberPresent(allDigitsText, num.split(",")[0]) || (re === COUNT_RE && !countPresent(allDigitsText, raw))) {
       if (!unknownMetrics.includes(raw)) { unknownMetrics.push(raw); unsupported = true; reasons.push(`Metric "${raw}" is not in your profile.`); }
     }
   }
@@ -112,6 +115,13 @@ export function checkClaim(text: string, ctx: TruthContext): ClaimCheck {
 }
 
 const normContains = (hay: string, needle: string) => norm(hay).includes(norm(needle));
+/** A count must appear with the same noun in the profile ("5 SoCs" is not backed by an unrelated "5"). People counts also match "team of N". */
+function countPresent(hay: string, claim: string): boolean {
+  const n = claim.match(/\d+/)![0];
+  const noun = claim.match(new RegExp(`(${COUNT_NOUN})\\b`, "i"))![1].toLowerCase().replace(/s$/, "").replace(/-/g, "-?");
+  if (new RegExp(`(?<![\\d.])${n}\\+?\\s+(?:[\\w-]+\\s+){0,3}?${noun}`, "i").test(hay)) return true;
+  return /^(?:engineer|member|people|developer)/.test(noun) && new RegExp(`team of\\s+${n}(?![\\d])`, "i").test(hay);
+}
 const numberPresent = (hay: string, num: string) => new RegExp(`(?<![\\d.])${num.replace(".", "\\.")}(?![\\d])`).test(hay);
 
 export function splitSentences(text: string): string[] {

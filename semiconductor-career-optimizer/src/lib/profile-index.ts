@@ -20,6 +20,7 @@ export function roleBullets(r: Role): string[] { return [...r.responsibilities, 
 export function buildIndex(profile: Profile): ProfileIndex {
   const items: EvidenceItem[] = [];
   for (const r of profile.roles) {
+    if (r.title) items.push({ roleId: r.id, roleLabel: roleLabel(r), field: "title", text: r.title, kind: "role-field" });
     for (const b of roleBullets(r)) items.push({ roleId: r.id, roleLabel: roleLabel(r), field: "bullet", text: b, kind: "bullet" });
     const fields: [string, string[]][] = [["technologies", r.technologies], ["tools", r.tools], ["protocols", r.protocols], ["methodologies", r.methodologies]];
     for (const [f, vals] of fields) if (vals.length) items.push({ roleId: r.id, roleLabel: roleLabel(r), field: f, text: vals.join(", "), kind: "role-field" });

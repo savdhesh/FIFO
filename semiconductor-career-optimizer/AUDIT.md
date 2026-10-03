@@ -8,6 +8,8 @@ Scope: the Claude artifact (`artifact/`, built to `dist/artifact.html`) and the 
 3. **Browser audit** (headless Chromium): full flow with 3 uploaded resumes (TXT, TXT, PDF), every tab and every top-level view at 1280 px and 400 px (horizontal overflow), unlabeled form controls, dark mode, localStorage blocked, ATS check on the exported PDF, vocabulary add/clash.
 4. **Spec walk-through**: each numbered requirement of the original brief checked against code.
 
+5. **Gold-set evaluation** (`eval/`, `npm run eval`, floors in `tests/eval.test.ts`): accuracy measured on unseen inputs with a holdout split. Baseline, fixes and open failures are in [eval/README.md](eval/README.md). The fixes are not repeated in the table below.
+
 ## Defects found and fixed
 | # | Finding | Fix |
 |---|---|---|

@@ -6,7 +6,7 @@ type Ctx = "required" | "preferred" | "responsibilities" | "boilerplate" | "admi
 
 const HEADINGS: [Ctx, RegExp][] = [
   ["preferred", /^(?:preferred|nice[- ]to[- ]have|desirable|bonus|a plus|good to have|additional (?:skills|qualifications)|preferred (?:qualifications|skills|experience))\b/i],
-  ["required", /^(?:requirements?|qualifications?|minimum (?:qualifications|requirements)|basic qualifications|must[- ]have|what you(?:'|’)ll need|what we(?:'|’)re looking for|skills|required (?:skills|qualifications|experience)|who you are|your profile|key requirements)\b/i],
+  ["required", /^(?:requirements?|qualifications?|minimum (?:qualifications|requirements)|basic qualifications|must[- ]have|what you(?:'|’)ll need|what we(?:'|’)re looking for|skills|required (?:skills|qualifications|experience)|who you are|your profile|key requirements|you should have|you have|what you bring|what we need|your (?:skills|experience|qualifications)|the ideal candidate)\b/i],
   ["responsibilities", /^(?:responsibilities|what you(?:'|’)ll do|the role|role|key responsibilities|duties|job description|about the role|your role|in this role|you will)\b/i],
   ["boilerplate", /^(?:about (?:us|the company|[A-Z][\w ]+)|who we are|benefits|what we offer|why join|perks|equal opportunity|eeo|our (?:culture|values|mission)|compensation|salary|diversity)\b/i],
 ];
@@ -49,9 +49,14 @@ export function parseJobDescriptionHeuristic(raw: string, hints: { company?: str
   let roleTitle = hints.title || labelled(/(?:job title|position|role|title)\s*[:\-–]\s*([^\n]{3,90})/i) ||
     first.find((l) => TITLE_WORDS.test(l) && l.length < 90 && !/\b(we|you|our|the)\b/i.test(l.split(/\s+/).slice(0, 2).join(" "))) || "";
   roleTitle = roleTitle.replace(/\s*[-–|]\s*(?:req|job)?\s*#?\w*\d{4,}\w*$/i, "").trim();
+  roleTitle = roleTitle.replace(/\s*\((?:[mfwdx]\s*\/\s*){1,3}[mfwdx]\)|\s*\(all genders\)/gi, "").trim(); // German "(m/f/d)" markers
   let company = hints.company || labelled(/(?:company|employer|organi[sz]ation)\s*[:\-–]\s*([^\n]{2,60})/i);
   if (!company) company = text.match(/^\s*about\s+(?!us\b|the\b)([A-Z][A-Za-z0-9&.\-]+(?:\s+[A-Z][A-Za-z0-9&.\-]+){0,3})\s*$/m)?.[1] ?? "";
-  if (!company) { const c = first[1]; if (c && c.length < 40 && !/[.:,;]/.test(c) && !TITLE_WORDS.test(c) && /^[A-Z]/.test(c)) company = c; }
+  if (!company && first[1] && !/^[A-Z][a-z]+(?: [A-Z][a-z]+)?,\s*[A-Z]{2}\b|^(?:remote|hybrid|on-?site)\b/i.test(first[1])) {
+    // Line 2 is usually "Company — City" / "Company | City" / "Company, City" / "Company (Remote)": keep the head.
+    const c = first[1].split(/\s+[—–|-]\s+|\s*\(|,\s+/)[0].trim();
+    if (c.length > 1 && c.length < 50 && !/[:;]|\.\s/.test(c) && !TITLE_WORDS.test(c) && /^[A-Z]/.test(c)) company = c;
+  }
   if (!company) company = text.match(/\b(?:join|about|at)\s+([A-Z][A-Za-z0-9&.\-]+(?:\s+[A-Z][A-Za-z0-9&.\-]+){0,3})(?=[\s,.:;!]|$)/)?.[1] ?? "";
   if (/^(?:the|our|us|this|a|an|you)$/i.test(company)) company = "";
   const location = labelled(/location\s*[:\-–]\s*([^\n]{2,80})/i);

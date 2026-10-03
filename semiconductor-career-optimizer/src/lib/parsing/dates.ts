@@ -1,6 +1,7 @@
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 const MONTH_RE = "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
-const DATE_TOKEN = `(?:${MONTH_RE}\\.?\\s*,?\\s*(?:19|20)\\d{2}|\\d{1,2}[/.](?:19|20)\\d{2}|(?:19|20)\\d{2})`;
+// "Jan'19" / "Jan ’19": apostrophe-abbreviated year, common on Indian resumes.
+const DATE_TOKEN = `(?:${MONTH_RE}\\.?\\s*,?\\s*(?:19|20)\\d{2}|${MONTH_RE}\\.?\\s*['’]\\s*\\d{2}(?!\\d)|\\d{1,2}[/.](?:19|20)\\d{2}|(?:19|20)\\d{2})`;
 const PRESENT = "(?:present|current|currently|now|till date|to date|ongoing|heute|bis heute|aktuell|aujourd.hui|actuel|actuellement|heden|nu|nuvarande|pågående|presente|actualidad|hoy)";
 export const DATE_RANGE_RE = new RegExp(`(${DATE_TOKEN})\\s*(?:-|–|—|to|until)\\s*(${DATE_TOKEN}|${PRESENT})`, "i");
 
@@ -11,6 +12,8 @@ export function parseYM(s: string, endOfYear = false): YM | null {
   if (new RegExp(`^${PRESENT}$`).test(t)) { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() + 1 }; }
   let r = t.match(new RegExp(`^(${MONTH_RE})\\.?\\s*,?\\s*((?:19|20)\\d{2})$`));
   if (r) return { y: +r[2], m: MONTHS.indexOf(r[1].slice(0, 3)) + 1 };
+  r = t.match(new RegExp(`^(${MONTH_RE})\\.?\\s*['’]\\s*(\\d{2})$`));
+  if (r) return { y: (+r[2] < 70 ? 2000 : 1900) + +r[2], m: MONTHS.indexOf(r[1].slice(0, 3)) + 1 };
   r = t.match(/^(\d{1,2})[/.]((?:19|20)\d{2})$/);
   if (r) return { y: +r[2], m: Math.min(12, Math.max(1, +r[1])) };
   r = t.match(/^((?:19|20)\d{2})$/);

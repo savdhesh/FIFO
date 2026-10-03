@@ -1,0 +1,592 @@
+{
+  "goldVersion": 1,
+  "goldCommit": "1afdff3",
+  "engineCommit": "1afdff3 + uncommitted engine changes",
+  "parse": {
+    "name": {
+      "dev": {
+        "ok": 3,
+        "n": 3,
+        "rate": 1
+      },
+      "holdout": {
+        "ok": 3,
+        "n": 3,
+        "rate": 1
+      }
+    },
+    "email": {
+      "dev": {
+        "ok": 3,
+        "n": 3,
+        "rate": 1
+      },
+      "holdout": {
+        "ok": 3,
+        "n": 3,
+        "rate": 1
+      }
+    },
+    "roleFound": {
+      "dev": {
+        "ok": 7,
+        "n": 7,
+        "rate": 1
+      },
+      "holdout": {
+        "ok": 6,
+        "n": 6,
+        "rate": 1
+      }
+    },
+    "title": {
+      "dev": {
+        "ok": 7,
+        "n": 7,
+        "rate": 1
+      },
+      "holdout": {
+        "ok": 6,
+        "n": 6,
+        "rate": 1
+      }
+    },
+    "employer": {
+      "dev": {
+        "ok": 7,
+        "n": 7,
+        "rate": 1
+      },
+      "holdout": {
+        "ok": 3,
+        "n": 6,
+        "rate": 0.5
+      }
+    },
+    "start": {
+      "dev": {
+        "ok": 7,
+        "n": 7,
+        "rate": 1
+      },
+      "holdout": {
+        "ok": 6,
+        "n": 6,
+        "rate": 1
+      }
+    },
+    "end": {
+      "dev": {
+        "ok": 7,
+        "n": 7,
+        "rate": 1
+      },
+      "holdout": {
+        "ok": 6,
+        "n": 6,
+        "rate": 1
+      }
+    },
+    "bullets": {
+      "dev": {
+        "ok": 7,
+        "n": 7,
+        "rate": 1
+      },
+      "holdout": {
+        "ok": 6,
+        "n": 6,
+        "rate": 1
+      }
+    },
+    "spurious": {
+      "dev": 0,
+      "holdout": 0
+    }
+  },
+  "jd": {
+    "title": {
+      "dev": {
+        "ok": 2,
+        "n": 4,
+        "rate": 0.5
+      },
+      "holdout": {
+        "ok": 2,
+        "n": 4,
+        "rate": 0.5
+      }
+    },
+    "company": {
+      "dev": {
+        "ok": 4,
+        "n": 4,
+        "rate": 1
+      },
+      "holdout": {
+        "ok": 3,
+        "n": 4,
+        "rate": 0.75
+      }
+    },
+    "seniority": {
+      "dev": {
+        "ok": 4,
+        "n": 4,
+        "rate": 1
+      },
+      "holdout": {
+        "ok": 4,
+        "n": 4,
+        "rate": 1
+      }
+    },
+    "years": {
+      "dev": {
+        "ok": 4,
+        "n": 4,
+        "rate": 1
+      },
+      "holdout": {
+        "ok": 4,
+        "n": 4,
+        "rate": 1
+      }
+    },
+    "recall": {
+      "dev": {
+        "ok": 50,
+        "n": 50,
+        "rate": 1
+      },
+      "holdout": {
+        "ok": 46,
+        "n": 59,
+        "rate": 0.7796610169491526
+      }
+    },
+    "precision": {
+      "dev": {
+        "ok": 50,
+        "n": 53,
+        "rate": 0.9433962264150944
+      },
+      "holdout": {
+        "ok": 45,
+        "n": 52,
+        "rate": 0.8653846153846154
+      }
+    },
+    "importance": {
+      "dev": {
+        "ok": 47,
+        "n": 48,
+        "rate": 0.9791666666666666
+      },
+      "holdout": {
+        "ok": 37,
+        "n": 38,
+        "rate": 0.9736842105263158
+      }
+    }
+  },
+  "importanceConfusion": {
+    "mandatory": {
+      "mandatory": 59,
+      "implied": 1
+    },
+    "preferred": {
+      "preferred": 25,
+      "mandatory": 1
+    }
+  },
+  "match": {
+    "e2e": {
+      "dev": {
+        "ok": 43,
+        "n": 50,
+        "rate": 0.86
+      },
+      "holdout": {
+        "ok": 41,
+        "n": 59,
+        "rate": 0.6949152542372882
+      }
+    },
+    "isolated": {
+      "dev": {
+        "ok": 43,
+        "n": 50,
+        "rate": 0.86
+      },
+      "holdout": {
+        "ok": 43,
+        "n": 49,
+        "rate": 0.8775510204081632
+      }
+    },
+    "overclaimE2E": {
+      "dev": {
+        "ok": 2,
+        "n": 50,
+        "rate": 0.04
+      },
+      "holdout": {
+        "ok": 3,
+        "n": 59,
+        "rate": 0.05084745762711865
+      }
+    },
+    "overclaimIso": {
+      "dev": {
+        "ok": 2,
+        "n": 50,
+        "rate": 0.04
+      },
+      "holdout": {
+        "ok": 3,
+        "n": 49,
+        "rate": 0.061224489795918366
+      }
+    },
+    "underclaimIso": {
+      "dev": {
+        "ok": 5,
+        "n": 50,
+        "rate": 0.1
+      },
+      "holdout": {
+        "ok": 3,
+        "n": 49,
+        "rate": 0.061224489795918366
+      }
+    },
+    "verdict": {
+      "dev": {
+        "ok": 4,
+        "n": 4,
+        "rate": 1
+      },
+      "holdout": {
+        "ok": 4,
+        "n": 4,
+        "rate": 1
+      }
+    },
+    "critTP": {
+      "dev": 1,
+      "holdout": 0
+    },
+    "critFP": {
+      "dev": 0,
+      "holdout": 1
+    },
+    "critFN": {
+      "dev": 1,
+      "holdout": 10
+    },
+    "critical": {
+      "dev": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 1,
+        "precision": 1,
+        "recall": 0.5
+      },
+      "holdout": {
+        "tp": 0,
+        "fp": 1,
+        "fn": 10,
+        "precision": 0,
+        "recall": 0
+      }
+    },
+    "confusion": {
+      "exact": {
+        "exact": 66,
+        "weak": 1,
+        "equivalent": 3,
+        "related": 1,
+        "missing": 1
+      },
+      "related": {
+        "related": 7
+      },
+      "weak": {
+        "related": 4,
+        "weak": 1,
+        "unmapped": 1,
+        "missing": 1
+      },
+      "missing": {
+        "missing": 12,
+        "related": 1,
+        "unmapped": 9
+      },
+      "equivalent": {
+        "weak": 1
+      }
+    },
+    "pairs": [
+      {
+        "id": "p1",
+        "split": "holdout",
+        "verdict": "STRONG APPLY",
+        "overall": 91,
+        "acceptable": [
+          "STRONG APPLY",
+          "APPLY"
+        ],
+        "engineCritical": []
+      },
+      {
+        "id": "p2",
+        "split": "dev",
+        "verdict": "APPLY WITH GAPS",
+        "overall": 62,
+        "acceptable": [
+          "APPLY",
+          "APPLY WITH GAPS"
+        ],
+        "engineCritical": []
+      },
+      {
+        "id": "p3",
+        "split": "holdout",
+        "verdict": "STRONG APPLY",
+        "overall": 86,
+        "acceptable": [
+          "STRONG APPLY",
+          "APPLY"
+        ],
+        "engineCritical": []
+      },
+      {
+        "id": "p4",
+        "split": "dev",
+        "verdict": "STRONG APPLY",
+        "overall": 92,
+        "acceptable": [
+          "STRONG APPLY",
+          "APPLY"
+        ],
+        "engineCritical": []
+      },
+      {
+        "id": "p5",
+        "split": "holdout",
+        "verdict": "APPLY",
+        "overall": 84,
+        "acceptable": [
+          "STRONG APPLY",
+          "APPLY"
+        ],
+        "engineCritical": [
+          "Communication"
+        ]
+      },
+      {
+        "id": "p6",
+        "split": "dev",
+        "verdict": "APPLY",
+        "overall": 77,
+        "acceptable": [
+          "STRONG APPLY",
+          "APPLY",
+          "APPLY WITH GAPS"
+        ],
+        "engineCritical": [
+          "Perl"
+        ]
+      },
+      {
+        "id": "p7",
+        "split": "holdout",
+        "verdict": "LOW PRIORITY",
+        "overall": 48,
+        "acceptable": [
+          "DO NOT APPLY",
+          "LOW PRIORITY"
+        ],
+        "engineCritical": []
+      },
+      {
+        "id": "p8",
+        "split": "dev",
+        "verdict": "APPLY",
+        "overall": 68,
+        "acceptable": [
+          "STRONG APPLY",
+          "APPLY"
+        ],
+        "engineCritical": []
+      }
+    ]
+  },
+  "truth": {
+    "exact": {
+      "dev": {
+        "ok": 30,
+        "n": 30,
+        "rate": 1
+      },
+      "holdout": {
+        "ok": 16,
+        "n": 20,
+        "rate": 0.8
+      }
+    },
+    "blockedRecall": {
+      "dev": {
+        "ok": 14,
+        "n": 14,
+        "rate": 1
+      },
+      "holdout": {
+        "ok": 6,
+        "n": 7,
+        "rate": 0.8571428571428571
+      }
+    },
+    "falseBlock": {
+      "dev": {
+        "ok": 0,
+        "n": 16,
+        "rate": 0
+      },
+      "holdout": {
+        "ok": 2,
+        "n": 13,
+        "rate": 0.15384615384615385
+      }
+    },
+    "overclaim": {
+      "dev": {
+        "ok": 0,
+        "n": 30,
+        "rate": 0
+      },
+      "holdout": {
+        "ok": 1,
+        "n": 20,
+        "rate": 0.05
+      }
+    }
+  },
+  "truthConfusion": {
+    "VERIFIED": {
+      "VERIFIED": 8
+    },
+    "SUPPORTED|VERIFIED": {
+      "SUPPORTED": 6
+    },
+    "UNSUPPORTED": {
+      "UNSUPPORTED": 20,
+      "SUPPORTED": 1
+    },
+    "VERIFIED|SUPPORTED": {
+      "SUPPORTED": 1
+    },
+    "SUPPORTED": {
+      "SUPPORTED": 9,
+      "INFERRED": 1
+    },
+    "INFERRED": {
+      "INFERRED": 2,
+      "UNSUPPORTED": 2
+    }
+  },
+  "ontologyGaps": {
+    "stakeholder communication": "partial: matched only \"stakeholder, communication\"",
+    "physical design": "no ontology term",
+    "place and route": "no ontology term",
+    "Innovus": "no ontology term",
+    "ICC2": "no ontology term",
+    "static timing analysis": "no ontology term",
+    "PrimeTime": "no ontology term",
+    "DRC/LVS": "no ontology term",
+    "Calibre": "no ontology term",
+    "advanced nodes": "no ontology term"
+  },
+  "failures": {
+    "dev": [
+      "[jd] j2-formal: extracted \"Signoff\" (implied) not in gold requirements",
+      "[jd] j4-safety title: got \"Verification Engineer – Functional Safety\", want \"Verification Engineer\"",
+      "[jd] j4-safety: extracted \"Automotive\" (implied) not in gold requirements",
+      "[jd] j8-aiarch title: got \"Verification Architect, AI-Driven Verification\", want \"Verification Architect\"",
+      "[jd] j8-aiarch \"LLM-based verification assistants\" importance: got mandatory, want preferred",
+      "[jd] j8-aiarch: extracted \"Bus Fabric\" (preferred) not in gold requirements",
+      "[match] p2 r5-eli×j2-formal \"design verification\": engine equivalent, gold exact",
+      "[match] p2 r5-eli×j2-formal \"formal sign-off\": engine related, gold exact",
+      "[match] p2 r5-eli×j2-formal \"cutpoints\": engine related (OVERCLAIM), gold weak",
+      "[gap] p2: gold critical \"Formal Abstraction\" not flagged critical by engine",
+      "[match] p4 r4-dara×j4-safety \"digital verification\": engine equivalent, gold exact",
+      "[match] p8 r3-chen×j8-aiarch \"design verification\": engine equivalent, gold exact",
+      "[match] p8 r3-chen×j8-aiarch \"verification methodology\": engine related (OVERCLAIM), gold weak",
+      "[match] p8 r3-chen×j8-aiarch \"technical leadership\": engine missing, gold weak"
+    ],
+    "holdout": [
+      "[parse] r3-chen role \"Staff Verification Engineer @ Kestrel Chips Pte Ltd\" employer: got \"Period\", want \"Kestrel Chips Pte Ltd\"",
+      "[parse] r5-eli role \"Senior Formal Verification Engineer @ Falcon Logic\" employer: got \"\", want \"Falcon Logic\"",
+      "[parse] r5-eli role \"Verification Engineer @ Osprey Devices\" employer: got \"Osprey Devices (Dallas)\", want \"Osprey Devices\"",
+      "[jd] j1-pcie title: got \"Senior Design Verification Engineer – PCIe/CXL\", want \"Senior Design Verification Engineer\"",
+      "[jd] j1-pcie company: got \"Wayne Interconnect · San Jose\", want \"Wayne Interconnect\"",
+      "[jd] j1-pcie requirement \"PCIe transaction layer\" (PCIe Transaction Layer): not extracted",
+      "[jd] j1-pcie: extracted \"Bus Fabric\" (implied) not in gold requirements",
+      "[jd] j1-pcie: extracted \"Subsystem Integration\" (implied) not in gold requirements",
+      "[jd] j3-cpu title: got \"Principal CPU Verification Engineer (RISC-V)\", want \"Principal CPU Verification Engineer\"",
+      "[jd] j3-cpu: \"privileged architecture\" and \"MMU\" collapse to one ontology term (Privilege Architecture)",
+      "[jd] j3-cpu \"technical leadership\" importance: got implied, want mandatory",
+      "[jd] j5-soclead requirement \"technical leadership\" (Technical Leadership): not extracted",
+      "[jd] j5-soclead requirement \"stakeholder communication\": not representable in ontology",
+      "[jd] j5-soclead requirement \"Arm\" (ARM): not extracted",
+      "[jd] j5-soclead: extracted \"Cross-Team Collaboration\" (mandatory) not in gold requirements",
+      "[jd] j5-soclead: extracted \"Communication\" (mandatory) not in gold requirements",
+      "[jd] j5-soclead: extracted \"Low-Power Verification\" (preferred) not in gold requirements",
+      "[jd] j7-pd requirement \"physical design\": not representable in ontology",
+      "[jd] j7-pd requirement \"place and route\": not representable in ontology",
+      "[jd] j7-pd requirement \"Innovus\": not representable in ontology",
+      "[jd] j7-pd requirement \"ICC2\": not representable in ontology",
+      "[jd] j7-pd requirement \"static timing analysis\": not representable in ontology",
+      "[jd] j7-pd requirement \"PrimeTime\": not representable in ontology",
+      "[jd] j7-pd requirement \"DRC/LVS\": not representable in ontology",
+      "[jd] j7-pd requirement \"Calibre\": not representable in ontology",
+      "[jd] j7-pd requirement \"advanced nodes\": not representable in ontology",
+      "[jd] j7-pd: extracted \"Clocking\" (mandatory) not in gold requirements",
+      "[jd] j7-pd: extracted \"Low-Power Verification\" (preferred) not in gold requirements",
+      "[match] p1 \"PCIe transaction layer\": ontology right (exact) but end-to-end not-extracted",
+      "[match] p1 r1-ana×j1-pcie \"root-cause debugging\": engine weak, gold exact",
+      "[match] p3 demo×j3-cpu \"load store unit\": engine related (OVERCLAIM), gold weak",
+      "[match] p3 demo×j3-cpu \"privileged architecture\": engine weak, gold equivalent",
+      "[match] p3 demo×j3-cpu \"riscv-dv\": engine related (OVERCLAIM), gold weak",
+      "[match] p3 demo×j3-cpu \"vector extension\": engine related (OVERCLAIM), gold missing",
+      "[gap] p3: gold critical \"Instruction Stream Generation\" not flagged critical by engine",
+      "[match] p5 \"technical leadership\": ontology right (exact) but end-to-end not-extracted",
+      "[match] p5 r6-fay×j5-soclead \"stakeholder communication\": engine unmapped, gold weak",
+      "[match] p5 r6-fay×j5-soclead \"Arm\": engine missing, gold exact",
+      "[gap] p5: engine flagged \"Communication\" critical; gold does not",
+      "[gap] p5: gold critical \"?stakeholder communication\" not flagged critical by engine",
+      "[match] p7 demo×j7-pd \"physical design\": engine unmapped, gold missing",
+      "[match] p7 demo×j7-pd \"place and route\": engine unmapped, gold missing",
+      "[match] p7 demo×j7-pd \"Innovus\": engine unmapped, gold missing",
+      "[match] p7 demo×j7-pd \"ICC2\": engine unmapped, gold missing",
+      "[match] p7 demo×j7-pd \"static timing analysis\": engine unmapped, gold missing",
+      "[match] p7 demo×j7-pd \"PrimeTime\": engine unmapped, gold missing",
+      "[match] p7 demo×j7-pd \"DRC/LVS\": engine unmapped, gold missing",
+      "[match] p7 demo×j7-pd \"Calibre\": engine unmapped, gold missing",
+      "[match] p7 demo×j7-pd \"advanced nodes\": engine unmapped, gold missing",
+      "[gap] p7: gold critical \"?physical design\" not flagged critical by engine",
+      "[gap] p7: gold critical \"?place and route\" not flagged critical by engine",
+      "[gap] p7: gold critical \"?Innovus\" not flagged critical by engine",
+      "[gap] p7: gold critical \"?ICC2\" not flagged critical by engine",
+      "[gap] p7: gold critical \"?static timing analysis\" not flagged critical by engine",
+      "[gap] p7: gold critical \"?PrimeTime\" not flagged critical by engine",
+      "[gap] p7: gold critical \"?DRC/LVS\" not flagged critical by engine",
+      "[gap] p7: gold critical \"?Calibre\" not flagged critical by engine",
+      "[truth] r5-eli: \"Experience with formal sign-off.\" got INFERRED, gold SUPPORTED — \"Formal Sign-off\" is plausible from Formal Verification but not stated — needs your confirmation.",
+      "[truth] r5-eli: \"Used cutpoints and abstraction to converge proofs.\" got UNSUPPORTED, gold INFERRED — \"Formal Abstraction\" is not in your profile (only related background via Formal Verification).",
+      "[truth] r5-eli: \"Holds a PhD in formal methods.\" got SUPPORTED (LEAK), gold UNSUPPORTED — All terms are present in your profile.",
+      "[truth] r5-eli: \"Defined the formal verification methodology for the company.\" got UNSUPPORTED, gold INFERRED — \"Architecture Ownership\" is not in your profile."
+    ]
+  }
+}
