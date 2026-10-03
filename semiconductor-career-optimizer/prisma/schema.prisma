@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ApplicationStatus {
+  SAVED
+  ANALYZED
+  APPLYING
+  APPLIED
+  RECRUITER_CONTACTED
+  SCREENING
+  TECHNICAL_ROUND
+  HIRING_MANAGER
+  FINAL_ROUND
+  OFFER
+  REJECTED
+  WITHDRAWN
+}
+
+model User {
+  id           String          @id @default(cuid())
+  email        String          @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime        @default(now())
+  profile      CareerProfile?
+  resumes      ResumeFile[]
+  applications Application[]
+}
+
+/// Structured career knowledge base. `data` is validated by Zod (src/lib/types.ts).
+model CareerProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data      Json
+  updatedAt DateTime @updatedAt
+}
+
+/// Uploaded master resume. File bytes live in private storage, never at a public URL.
+model ResumeFile {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename   String
+  mime       String
+  size       Int
+  storageKey String
+  rawText    String
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+/// One analyzed job = one application record (analysis + tailoring state + tracking fields).
+model Application {
+  id              String            @id @default(cuid())
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company         String            @default("")
+  roleTitle       String            @default("")
+  jobUrl          String?
+  jdText          String
+  settings        Json
+  parsedJd        Json
+  match           Json
+  tailored        Json?
+  changes         Json?
+  coverLetter     Json?
+  truthAudit      Json?
+  matchScore      Int
+  recommendation  String
+  status          ApplicationStatus @default(ANALYZED)
+  appliedAt       DateTime?
+  recruiterName   String?
+  recruiterContact String?
+  notes           String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([userId, createdAt])
+}

@@ -1,0 +1,50 @@
+import type { EvidenceRef, Profile, Role } from "./types";
+import { ontology } from "./ontology/ontology";
+import { totalYears } from "./parsing/dates";
+
+export const roleLabel = (r: Role) => [r.title || "Role", r.employer].filter(Boolean).join(" @ ");
+
+export interface EvidenceItem extends EvidenceRef { kind: "bullet" | "skills" | "role-field" | "summary" }
+
+export interface ProfileIndex {
+  profile: Profile;
+  terms: Map<string, Set<string>>; // canonical -> surface forms
+  evidence: Map<string, EvidenceItem[]>;
+  items: EvidenceItem[];
+  allText: string;
+  years: number;
+}
+
+export function roleBullets(r: Role): string[] { return [...r.responsibilities, ...r.achievements]; }
+
+export function buildIndex(profile: Profile): ProfileIndex {
+  const items: EvidenceItem[] = [];
+  for (const r of profile.roles) {
+    for (const b of roleBullets(r)) items.push({ roleId: r.id, roleLabel: roleLabel(r), field: "bullet", text: b, kind: "bullet" });
+    const fields: [string, string[]][] = [["technologies", r.technologies], ["tools", r.tools], ["protocols", r.protocols], ["methodologies", r.methodologies]];
+    for (const [f, vals] of fields) if (vals.length) items.push({ roleId: r.id, roleLabel: roleLabel(r), field: f, text: vals.join(", "), kind: "role-field" });
+    for (const [f, v] of [["leadership", r.leadership], ["technicalOwnership", r.technicalOwnership], ["architectureOwnership", r.architectureOwnership], ["customerFacing", r.customerFacing]] as const)
+      if (v) items.push({ roleId: r.id, roleLabel: roleLabel(r), field: f, text: v, kind: "role-field" });
+  }
+  for (const [cat, vals] of Object.entries(profile.skills)) if (vals.length) items.push({ roleId: "skills", roleLabel: "Skills", field: cat, text: vals.join(", "), kind: "skills" });
+  if (profile.summary) items.push({ roleId: "summary", roleLabel: "Summary", field: "summary", text: profile.summary, kind: "summary" });
+  for (const c of profile.certifications) items.push({ roleId: "certifications", roleLabel: "Certifications", field: "cert", text: c, kind: "skills" });
+
+  const terms = new Map<string, Set<string>>();
+  const evidence = new Map<string, EvidenceItem[]>();
+  for (const it of items) {
+    for (const h of ontology.findTerms(it.text)) {
+      if (!terms.has(h.canonical)) terms.set(h.canonical, new Set());
+      terms.get(h.canonical)!.add(h.surface.toLowerCase());
+      const arr = evidence.get(h.canonical) ?? [];
+      if (!arr.includes(it)) arr.push(it);
+      evidence.set(h.canonical, arr);
+    }
+  }
+  const years = totalYears(profile.roles.map((r) => ({ start: r.startDate, end: r.endDate })));
+  const allText = items.map((i) => i.text).join("\n") + "\n" + profile.roles.map((r) => `${r.title} ${r.employer} ${r.client} ${r.location}`).join("\n") +
+    "\n" + profile.education.map((e) => `${e.degree} ${e.university} ${e.specialization}`).join("\n") + "\n" + profile.certifications.join("\n") + "\n" + profile.publications.join("\n");
+  return { profile, terms, evidence, items, allText, years };
+}
+
+export const toEvidenceRef = (e: EvidenceItem): EvidenceRef => ({ roleId: e.roleId, roleLabel: e.roleLabel, field: e.field, text: e.text });

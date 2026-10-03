@@ -1,0 +1,30 @@
+Alex Demo
+Bangalore, India | alex.demo@example.com | +91 98000 00000
+linkedin.com/in/alexdemo | github.com/alexdemo
+
+PROFESSIONAL SUMMARY
+Verification engineer with 13 years in SoC and IP verification.
+
+EXPERIENCE
+Principal Verification Engineer | Example Semiconductors | Bangalore, India
+Jan 2019 – Present
+• Owned UVM verification architecture for a multi-block SoC subsystem, including agents, scoreboards, reference models and functional coverage.
+• Led a team of 6 engineers through coverage closure and regression debug using Xcelium and Verdi.
+• Developed RISC-V CPU verification environment with ISS comparison, CSR and interrupt/exception checking.
+• Built Python and Perl regression automation for nightly runs.
+• Verified PCIe and AXI interfaces; performed gate-level simulation (GLS) for automotive ASIL-B safety-critical SoC.
+
+Senior Verification Engineer, Sample Chips Pvt Ltd, Hyderabad, India
+Jun 2013 - Dec 2018
+- Created UVM testcases for IP blocks.
+- Wrote SystemVerilog assertions (SVA) and performed formal verification using Questa Formal.
+- Worked on SerDes verification and debug of ARM-based subsystem.
+
+EDUCATION
+B.Tech in Electronics, Example University, 2011
+
+TECHNICAL SKILLS
+Languages: SystemVerilog, Verilog, C, Python, Perl, Tcl
+Verification: UVM, SVA, functional coverage, constrained random verification
+Tools: Xcelium, VCS, Verdi, Questa Formal, Git, Jenkins
+Protocols: AXI, AHB, APB, PCIe
