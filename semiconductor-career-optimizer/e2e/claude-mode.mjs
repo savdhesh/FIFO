@@ -11,7 +11,7 @@ const page = await ctx.newPage(); const errs = []; page.on("pageerror", e => err
 await page.goto(`file://${process.cwd()}/dist/artifact.html`);
 await page.waitForFunction(() => !document.querySelector("#use-claude").disabled);
 console.log("toggle enabled with function-valued sample:", await page.isEnabled("#use-claude"));
-await page.check("#use-claude"); await page.setInputFiles("#resume-file", "tests/fixtures/demo-resume.txt"); await page.waitForSelector("#parse-review", { timeout: 20000 });
+await page.check("#use-claude"); await page.setInputFiles("#resume-file", "tests/fixtures/demo-resume.txt"); await page.waitForSelector("#build-profile", { timeout: 30000 }); await page.click("#build-profile"); await page.click("text=Check parse"); await page.waitForSelector("#parse-review");
 console.log("sample calls:", await page.evaluate(() => window.__calls), "| source:", /built-in parser \(Claude/.test(await page.textContent("#parse-review")) ? "heuristic won over weaker Claude parse" : "other");
 await page.click("button:has-text('Analyze a job')"); await page.click("text=Use sample JD"); await page.click("button:has-text('Analyze match')"); await page.waitForSelector("text=Recommendation");
 await page.click("[role=tab]:has-text('Resume Changes')"); await page.click("button:has-text('Generate application pack')"); await page.waitForSelector("text=Accept all safe changes");

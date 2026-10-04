@@ -22,7 +22,8 @@ import { weakTopics, type CoachResult } from "../src/lib/coach/coach";
 import { THEMES, themeById } from "../src/lib/export/themes";
 import { ontology, type VocabEntry } from "../src/lib/ontology/ontology";
 import { DEFAULT_WEIGHTS } from "../src/lib/matching/matcher";
-import { buildIndex } from "../src/lib/profile-index";
+import { buildIndex, latestRole } from "../src/lib/profile-index";
+const latestRoleTitle = (p: Profile) => latestRole(p)?.title || "no roles found";
 
 declare const claude: any;
 const KEY = "sco.v1";
@@ -46,11 +47,11 @@ const localAdapter: Adapter = {
   save(state) { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* blocked or full: the page keeps working without persistence */ } },
 };
 const adapter: Adapter = (globalThis as any).SCO_ADAPTER ?? localAdapter;
-type Resume = { id: string; name: string; addedAt: string; profile: Profile; ats?: AtsReport | null; diag?: ParseDiagnostics | null; source?: string; fileId?: string };
+type Resume = { id: string; name: string; addedAt: string; profile: Profile; ats?: AtsReport | null; diag?: ParseDiagnostics | null; source?: string; fileId?: string; hash?: string; mergedAt?: string };
 type Prefs = { weights?: Record<string, number>; theme: string; vocab: VocabEntry[] };
 type Store = { profile: Profile | null; apps: AppRecord[]; resumes: Resume[]; prefs: Prefs };
 const DEFAULT_PREFS: Prefs = { theme: "plain", vocab: [] };
-const hydrate = (s: any): Store => { try { if (!s) throw new Error("empty"); const prefs = { ...DEFAULT_PREFS, ...(s.prefs ?? {}) }; ontology.setCustom(prefs.vocab); return { profile: s.profile ? ProfileSchema.parse(s.profile) : null, apps: s.apps ?? [], resumes: (s.resumes ?? []).map((r: Resume) => ({ ...r, profile: ProfileSchema.parse(r.profile) })), prefs }; } catch { return { profile: null, apps: [], resumes: [], prefs: DEFAULT_PREFS }; } };
+const hydrate = (s: any): Store => { try { if (!s) throw new Error("empty"); const prefs = { ...DEFAULT_PREFS, ...(s.prefs ?? {}) }; ontology.setCustom(prefs.vocab); return { profile: s.profile ? ProfileSchema.parse(s.profile) : null, apps: s.apps ?? [], resumes: (s.resumes ?? []).map((r: Resume) => ({ ...r, mergedAt: r.mergedAt ?? (s.profile ? r.addedAt : undefined), profile: ProfileSchema.parse(r.profile) })), prefs }; } catch { return { profile: null, apps: [], resumes: [], prefs: DEFAULT_PREFS }; } };
 
 
 const STATUSES = ["SAVED", "ANALYZED", "APPLYING", "APPLIED", "RECRUITER_CONTACTED", "SCREENING", "TECHNICAL_ROUND", "HIRING_MANAGER", "FINAL_ROUND", "OFFER", "REJECTED", "WITHDRAWN"];
@@ -117,48 +118,111 @@ const csv = (a: string[]) => a.join(", "); const unCsv = (s: string) => s.split(
 const lines = (a: string[]) => a.join("\n"); const unLines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
 const SKILL_LABEL: Record<string, string> = { languages: "HDL / Languages", verification: "Verification", formal: "Formal verification", processor: "Processor / ISA", protocols: "Interfaces / Protocols", domains: "Verification domains", tools: "Tools", methodologies: "Methodologies" };
 
+/** Content hash of normalised resume text: the same resume uploaded from two places is recognised as one. */
+const textHash = (t: string) => { let h = 5381; for (const c of t.toLowerCase().replace(/\s+/g, " ").trim()) h = ((h << 5) + h + c.charCodeAt(0)) | 0; return (h >>> 0).toString(36); };
+const ACCEPT = /\.(pdf|docx|txt)$/i;
+
 function ProfileView({ profile, setProfile, resumes, setResumes, provider, run, say, claudeOn, goAnalyze }: any) {
   const file = useRef<HTMLInputElement>(null);
   const [paste, setPaste] = useState("");
+  const [drag, setDrag] = useState(false);
   const [report, setReport] = useState<MergeReport | null>(null);
-  const [review, setReview] = useState<{ name: string; diag: ParseDiagnostics; source: string } | null>(null);
+  const [review, setReview] = useState<{ id: string; name: string; diag: ParseDiagnostics; source: string } | null>(null);
   const [items, setItems] = useState<MergeItem[]>([]);
-  const addResume = async (name: string, text: string, existing: Resume[], layout?: any) => {
+  const pending: Resume[] = resumes.filter((r: Resume) => !r.mergedAt);
+
+  // Step 1: add. Each resume is parsed when added and kept in the library; nothing touches the profile yet.
+  const addResume = async (name: string, text: string, existing: Resume[], layout?: any): Promise<{ all: Resume[]; added: boolean }> => {
     if (text.trim().length < 200) throw new Error(`${name}: almost no text found. This looks like a scanned/image file, which an ATS cannot read either. Use a text-based PDF, DOCX or TXT, or paste the text.`);
+    const hash = textHash(text);
+    const dup = existing.find((r) => r.hash === hash);
+    if (dup) return { all: existing, added: false };
     const parsed = await parseResume(provider, text);
-    setReview({ name, diag: parsed.diag, source: parsed.source });
-    return [...existing, { id: `res${Date.now().toString(36)}${existing.length}`, name, addedAt: new Date().toISOString(), profile: parsed.profile, ats: atsParse(text, layout), diag: { ...parsed.diag, unplaced: parsed.diag.unplaced }, source: parsed.source }];
+    return { all: [...existing, { id: `res${Date.now().toString(36)}${existing.length}`, name, addedAt: new Date().toISOString(), profile: parsed.profile, ats: atsParse(text, layout), diag: { ...parsed.diag, unplaced: parsed.diag.unplaced }, source: parsed.source, hash }], added: true };
   };
-  const afterAdd = (all: Resume[]) => {
+  const afterAdd = (all: Resume[], added: number, skipped: string[]) => {
     setResumes(() => all);
-    let base = profile;
-    if (!base) { const r = mergeResumes(all.map((x) => ({ id: x.id, name: x.name, profile: x.profile }))); base = r.base; setProfile(base); say("ok", `Created your profile from ${r.analysis.baseName}. ${all.length > 1 ? "Review the merge below to bring in details from your other resumes." : "Review and correct it below."}`); }
-    if (all.length > 1 || profile) { const r = mergeResumes(all.map((x) => ({ id: x.id, name: x.name, profile: x.profile })), base); setReport(r); setItems(r.items); if (profile) say("ok", `${all.length} resume(s) analysed: ${r.items.length} proposed change(s) to review. Nothing is applied until you accept it.`); }
+    const waiting = all.filter((r) => !r.mergedAt).length;
+    const dupNote = skipped.length ? ` Skipped ${skipped.join(", ")}: already in your library.` : "";
+    if (added) say("ok", `Added ${added} resume${added > 1 ? "s" : ""}. ${waiting} ready to ${profile ? "merge" : "build your profile from"}. Add more from anywhere, then select ${profile ? "Merge into profile" : "Build profile"} when you are done.${dupNote}`);
+    else if (skipped.length) say("err", `Nothing added.${dupNote}`);
   };
-  const onFiles = (files: File[]) => run(claudeOn ? "Reading resumes with Claude…" : "Reading resumes…", async () => {
-    let all: Resume[] = resumes;
-    for (const f of files) { const ex = await extractWithLayout(f); all = await addResume(f.name, ex.text, all, ex.layout); if (adapter.storeFile) { try { const id = await adapter.storeFile(f); all = all.map((r, i) => (i === all.length - 1 ? { ...r, fileId: id } : r)); } catch { /* original file not stored; parsed data is kept */ } } }
-    afterAdd(all);
-  });
+  const onFiles = (files: File[]) => {
+    const bad = files.filter((f) => !ACCEPT.test(f.name));
+    const ok = files.filter((f) => ACCEPT.test(f.name));
+    if (bad.length) say("err", `${bad.map((f) => f.name).join(", ")}: only PDF, DOCX or TXT files can be read.`);
+    if (!ok.length) return;
+    run(claudeOn ? "Reading resumes with Claude…" : "Reading resumes…", async () => {
+      let all: Resume[] = resumes, added = 0;
+      const skipped: string[] = [];
+      for (const f of ok) {
+        const ex = await extractWithLayout(f);
+        const r = await addResume(f.name, ex.text, all, ex.layout);
+        if (!r.added) { skipped.push(f.name); continue; }
+        all = r.all; added++;
+        if (adapter.storeFile) { try { const id = await adapter.storeFile(f); all = all.map((x, i) => (i === all.length - 1 ? { ...x, fileId: id } : x)); } catch { /* original file not stored; parsed data is kept */ } }
+      }
+      afterAdd(all, added, skipped);
+    });
+  };
+
+  // Step 2: build. Runs once you have added everything: the strongest resume becomes the base, the rest are proposed as additions.
+  const build = () => {
+    if (!resumes.length) return;
+    const src = resumes.map((x: Resume) => ({ id: x.id, name: x.name, profile: x.profile }));
+    let base = profile;
+    if (!base) { const r0 = mergeResumes(src); base = r0.base; setProfile(base); }
+    const r = mergeResumes(src, base);
+    const now = new Date().toISOString();
+    setResumes((xs: Resume[]) => xs.map((x) => (x.mergedAt ? x : { ...x, mergedAt: now })));
+    setReview(null);
+    if (resumes.length > 1 || profile) { setReport(r); setItems(r.items); }
+    say("ok", profile
+      ? `${pending.length} new resume(s) compared with your profile: ${r.items.length} proposed change(s). Nothing is applied until you accept it.`
+      : `Profile built from ${r.analysis.baseName}${resumes.length > 1 ? `; ${r.items.length} addition(s) from your other ${resumes.length - 1} resume(s) to review below` : ""}. Correct anything the parser got wrong.`);
+  };
+
+  const setResumeProfile = (id: string) => (p: Profile) => setResumes((xs: Resume[]) => xs.map((x) => (x.id === id ? { ...x, profile: p } : x)));
   const decide = (id: string, decision: MergeItem["decision"]) => setItems((xs) => xs.map((x) => (x.id === id ? { ...x, decision } : x)));
   const accepted = items.filter((i) => i.decision === "accepted").length;
   const groups = useMemo(() => { const m = new Map<string, MergeItem[]>(); for (const i of items) m.set(i.group, [...(m.get(i.group) ?? []), i]); return [...m.entries()]; }, [items]);
+  const step = !resumes.length && !profile ? 1 : pending.length ? 2 : report ? 3 : 4;
+  const STEPS = ["Add resumes", profile ? "Merge into profile" : "Build profile", "Review merge", "Analyze a job"];
+  const reviewed: Resume | undefined = review ? resumes.find((r: Resume) => r.id === review.id) : undefined;
   return (
     <div className="space-y-4">
       <Card className="space-y-3">
-        <h2 className="text-sm font-semibold">Resume library</h2>
-        <p className="text-sm text-gray-600">Upload your current resume and any older ones (PDF, DOCX or TXT, 5 MB each). They are read inside this page and kept only in this browser. {claudeOn ? "Claude is on: resume text is sent to Claude for parsing." : "Parsing runs locally with the built-in engine."} Older resumes are compared against your profile to recover projects, bullets, skills and credentials you may have dropped.</p>
-        <div className="flex flex-wrap gap-2">
-          <input ref={file} type="file" id="resume-file" multiple accept=".pdf,.docx,.txt" className="hidden" onChange={(e) => { const fs = [...(e.target.files ?? [])]; if (fs.length) onFiles(fs); e.target.value = ""; }} />
-          <Button onClick={() => file.current?.click()}>Upload resumes</Button>
-          <Button variant="outline" onClick={() => { setProfile(parseResumeHeuristic(DEMO_RESUME_TEXT)); say("ok", "Fictional demo profile ready."); }}>Load demo profile</Button>
-          {resumes.length > 0 && profile && <Button variant="outline" onClick={() => { const r = mergeResumes(resumes.map((x: Resume) => ({ id: x.id, name: x.name, profile: x.profile })), profile); setReport(r); setItems(r.items); }}>Re-analyse library against profile</Button>}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold">Resume library</h2>
+          <ol className="m-0 flex list-none flex-wrap gap-1 pl-0 text-xs" aria-label="Progress">{STEPS.map((t, i) => <li key={t} aria-current={step === i + 1 ? "step" : undefined} className={cx("rounded-full border px-2 py-0.5", step === i + 1 ? "border-view bg-view text-on-view" : step > i + 1 ? "border-view text-view" : "border-line text-gray-500")}>{i + 1}. {t}</li>)}</ol>
         </div>
-        <details><summary className="cursor-pointer text-sm underline">Paste resume text instead</summary><Textarea id="resume-paste" aria-label="Resume text" rows={8} className="mt-2" value={paste} onChange={(e) => setPaste(e.target.value)} /><Button className="mt-2" variant="outline" disabled={paste.length < 50} onClick={() => run("Parsing…", async () => { afterAdd(await addResume(`pasted-${resumes.length + 1}.txt`, paste, resumes)); setPaste(""); })}>Add pasted resume</Button></details>
-        {resumes.length > 0 && <ul className="divide-y divide-line rounded-md border border-line text-sm">{resumes.map((r: Resume) => <li key={r.id} className="flex items-center justify-between gap-2 p-2"><span><b>{r.name}</b> <span className="text-gray-500">· {r.profile.roles.length} roles, {r.profile.roles.reduce((a, x) => a + x.responsibilities.length + x.achievements.length, 0)} bullets · {r.profile.roles[0]?.title ?? "no roles found"}</span> {r.ats && <span title={r.ats.checks.filter((c) => c.status !== "pass").map((c) => `${c.label}: ${c.detail}`).join("\n") || "No ATS issues found"}><Badge tone={r.ats.risk === "Low" ? "green" : r.ats.risk === "Medium" ? "amber" : "red"}>ATS {r.ats.risk}</Badge></span>}</span><button className="text-xs text-red-800 underline" onClick={() => { if (r.fileId && adapter.deleteFile) adapter.deleteFile(r.fileId).catch(() => undefined); setResumes((xs: Resume[]) => xs.filter((x) => x.id !== r.id)); }}>Remove</button></li>)}</ul>}
+        <p className="text-sm text-gray-600">Add your current resume and any older ones, as many times as you like and from anywhere: pick files, drop them here, or paste text. Each one is read and kept in this library (in this browser only); nothing changes your profile until you build it. {claudeOn ? "Claude is on: resume text is sent to Claude for parsing." : "Parsing runs locally with the built-in engine."}</p>
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
+          onDrop={(e) => { e.preventDefault(); setDrag(false); const fs = [...e.dataTransfer.files]; if (fs.length) onFiles(fs); }}
+          className={cx("flex flex-wrap items-center gap-2 rounded-lg border-2 border-dashed p-4", drag ? "border-view bg-view-soft" : "border-line")}>
+          <input ref={file} type="file" id="resume-file" multiple accept=".pdf,.docx,.txt" className="hidden" onChange={(e) => { const fs = [...(e.target.files ?? [])]; if (fs.length) onFiles(fs); e.target.value = ""; }} />
+          <Button variant={resumes.length ? "outline" : "primary"} onClick={() => file.current?.click()}>{resumes.length ? "Add more resumes" : "Add resumes"}</Button>
+          <span className="text-sm text-gray-500">or drop PDF, DOCX or TXT files here (5 MB each)</span>
+          {!profile && !resumes.length && <Button variant="ghost" className="ml-auto" onClick={() => { setProfile(parseResumeHeuristic(DEMO_RESUME_TEXT)); say("ok", "Fictional demo profile ready."); }}>Load demo profile</Button>}
+        </div>
+        <details><summary className="cursor-pointer text-sm underline">Paste resume text instead</summary><Textarea id="resume-paste" aria-label="Resume text" rows={8} className="mt-2" value={paste} onChange={(e) => setPaste(e.target.value)} /><Button className="mt-2" variant="outline" disabled={paste.length < 50} onClick={() => run("Parsing…", async () => { const r = await addResume(`pasted-${resumes.length + 1}.txt`, paste, resumes); afterAdd(r.all, r.added ? 1 : 0, r.added ? [] : ["the pasted text"]); setPaste(""); })}>Add pasted resume</Button></details>
+        {resumes.length > 0 && <ul className="divide-y divide-line rounded-md border border-line text-sm">{resumes.map((r: Resume) => <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 p-2">
+          <span className="min-w-0"><b>{r.name}</b> <span className="text-gray-500">· {r.profile.roles.length} roles, {r.profile.roles.reduce((a, x) => a + x.responsibilities.length + x.achievements.length, 0)} bullets · {latestRoleTitle(r.profile)}</span>{" "}
+            <Badge tone={r.mergedAt ? "gray" : "blue"}>{r.mergedAt ? "in profile" : "ready"}</Badge>{" "}
+            {r.diag && <Badge tone={r.diag.confidence === "High" ? "green" : r.diag.confidence === "Medium" ? "amber" : "red"}>parse {r.diag.confidence.toLowerCase()}</Badge>}{" "}
+            {r.ats && <span title={r.ats.checks.filter((c) => c.status !== "pass").map((c) => `${c.label}: ${c.detail}`).join("\n") || "No ATS issues found"}><Badge tone={r.ats.risk === "Low" ? "green" : r.ats.risk === "Medium" ? "amber" : "red"}>ATS {r.ats.risk}</Badge></span>}</span>
+          <span className="flex gap-3">{r.diag && <button className="text-xs underline" onClick={() => setReview({ id: r.id, name: r.name, diag: r.diag!, source: r.source ?? "built-in engine" })}>Check parse</button>}
+            <button className="text-xs text-red-800 underline" onClick={() => { if (r.fileId && adapter.deleteFile) adapter.deleteFile(r.fileId).catch(() => undefined); setResumes((xs: Resume[]) => xs.filter((x) => x.id !== r.id)); if (review?.id === r.id) setReview(null); }}>Remove</button></span></li>)}</ul>}
+        {resumes.length > 0 && <div className="flex flex-wrap items-center gap-3">
+          {pending.length > 0
+            ? <Button id="build-profile" onClick={build}>{profile ? `Merge ${pending.length} new resume${pending.length > 1 ? "s" : ""} into profile` : `Build profile from ${resumes.length} resume${resumes.length > 1 ? "s" : ""}`}</Button>
+            : profile && <Button variant="outline" onClick={() => { const r = mergeResumes(resumes.map((x: Resume) => ({ id: x.id, name: x.name, profile: x.profile })), profile); setReport(r); setItems(r.items); }}>Re-analyse library against profile</Button>}
+          {pending.length > 0 && <span className="text-xs text-gray-500">Add everything first; you can still add more later and merge again.</span>}
+        </div>}
       </Card>
 
-      {review && <ParseReview review={review} profile={profile} setProfile={setProfile} close={() => setReview(null)} />}
+      {review && reviewed && <ParseReview review={review} profile={reviewed.mergedAt && profile ? profile : reviewed.profile} setProfile={reviewed.mergedAt && profile ? setProfile : setResumeProfile(reviewed.id)} close={() => setReview(null)} />}
       {report && (
         <Card className="space-y-4" id="merge-review">
           <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">Merge review <span className="font-normal text-gray-500">· base: {report.analysis.baseName}</span></h2>
@@ -179,7 +243,7 @@ function ProfileView({ profile, setProfile, resumes, setResumes, provider, run, 
             </div>))}</div></div>)}
         </Card>
       )}
-      {profile ? <ProfileEditor profile={profile} setProfile={setProfile} say={say} goAnalyze={goAnalyze} /> : <Card className="text-sm text-gray-600">No profile yet. Upload resumes or load the demo profile to begin.</Card>}
+      {profile ? <ProfileEditor profile={profile} setProfile={setProfile} say={say} goAnalyze={goAnalyze} /> : <Card className="text-sm text-gray-600">{resumes.length ? `No profile yet. ${resumes.length} resume${resumes.length > 1 ? "s" : ""} in the library: add any others, then select Build profile.` : "No profile yet. Add your resumes (or load the demo profile) to begin."}</Card>}
     </div>
   );
 }

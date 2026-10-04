@@ -12,11 +12,21 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
 
 // 2. full flow + every tab, desktop and mobile
 const page = await mk(); await page.goto(URL);
-await page.setInputFiles("#resume-file", ["tests/fixtures/demo-resume.txt", "tests/fixtures/demo-resume.txt", "tests/fixtures/demo-resume.txt"]);
-await page.waitForSelector("#merge-review", { timeout: 30000 });
+// Staged upload: two separate picks (as if from different folders), one duplicate, then build once.
+await page.setInputFiles("#resume-file", "tests/fixtures/demo-resume.txt"); await page.waitForSelector("#build-profile", { timeout: 30000 });
+if (await page.locator("#id-name").count()) problems.push("STAGING: profile was created before Build profile");
+await page.setInputFiles("#resume-file", ["tests/fixtures/resumes/d-promotions-inline-skills.txt", "tests/fixtures/demo-resume.txt"]);
+await page.waitForSelector("text=/Skipped demo-resume.txt: already in your library/", { timeout: 30000 });
+const buildLabel = await page.textContent("#build-profile"); console.log("build button:", buildLabel);
+if (!/from 2 resumes/.test(buildLabel)) problems.push("STAGING: expected 2 staged resumes, got " + buildLabel);
+await page.click("#build-profile"); await page.waitForSelector("#merge-review", { timeout: 30000 });
+console.log("library badges after build:", await page.locator("text=in profile").count(), "in profile");
 console.log("library ATS badges:", await page.locator("text=/ATS (Low|Medium|High)/").allTextContents());
 await page.click("button:has-text('Accept all additions')");
 if (await page.locator("button:has-text('Apply'):not([disabled])").count()) await page.click("button:has-text('Apply')"); else await page.click("#merge-review >> button:has-text('Close')");
+// Later: one more resume from somewhere else is staged, then merged on request.
+await page.setInputFiles("#resume-file", "tests/fixtures/resumes/a-rightdates.txt"); await page.waitForSelector("#build-profile:has-text('Merge 1 new resume into profile')", { timeout: 30000 });
+await page.click("#build-profile"); await page.waitForSelector("#merge-review"); await page.click("#merge-review >> button:has-text('Close')"); console.log("merge-later path OK");
 await page.click("button:has-text('Analyze a job')"); await page.click("text=Use sample JD"); await page.click("button:has-text('Analyze match')"); await page.waitForSelector("text=Recommendation");
 const unlabeled = async (where) => { const n = await page.evaluate(() => [...document.querySelectorAll("input,select,textarea")].filter(e => e.type!=="hidden" && e.type!=="file" && !e.labels?.length && !e.getAttribute("aria-label") && !e.closest("label")).map(e => e.id || e.placeholder || e.tagName)); if (n.length) problems.push(`UNLABELED(${where}): ${n.join(",")}`); };
 const overflow = async (where) => { const o = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth); if (o > 1) problems.push(`H-OVERFLOW ${o}px (${where})`); };

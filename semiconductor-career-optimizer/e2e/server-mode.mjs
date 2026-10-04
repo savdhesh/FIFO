@@ -11,7 +11,7 @@ console.log("workspace loaded; user shown:", (await page.textContent("header")).
 // upload resume w/ AI on (stub returns forged profile)
 await page.check("#use-claude");
 await page.setInputFiles("#resume-file", "tests/fixtures/demo-resume.txt");
-await page.waitForSelector("#parse-review", { timeout: 30000 });
+await page.waitForSelector("#build-profile", { timeout: 30000 }); await page.click("#build-profile"); await page.click("text=Check parse"); await page.waitForSelector("#parse-review");
 const rev = await page.textContent("#parse-review"); console.log("parse source:", /built-in parser/.test(rev) ? "built-in (AI result rejected: covered less)" : "AI", "| roles in profile:", await page.locator("input[id$='-title']").count());
 const prof = await page.inputValue("#r0-employer"); console.log("employer:", prof);
 const bullets = await page.inputValue("#r0-resp"); console.log("forged content absent:", !/Imaginary|40%|JasperGold/.test(bullets));
