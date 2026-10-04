@@ -1,0 +1,21 @@
+Chris Fictional
+Penang, Malaysia | chris.f@example.com | +60 12-000 0000
+
+Experience
+
+Verification Engineer
+Umbrella Devices Sdn Bhd, Penang, Malaysia
+Jun 2019 – Present
+o Developed UVM agents for an I3C controller and
+integrated them into the subsystem testbench, covering
+register access and interrupt flows.
+o Debugged simulation failures using Verdi and
+resolved root causes with the design team.
+
+Junior Engineer
+Stark Electronics, Penang, Malaysia
+Jan 2017 – May 2019
+o Wrote directed SystemVerilog tests for SPI slaves.
+
+Education
+BSc Electrical Engineering, Example University Malaysia, 2016

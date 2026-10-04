@@ -1,0 +1,21 @@
+Verification Architect, AI-Driven Verification
+Massive Dynamic Semiconductors (Remote, Singapore or Malaysia)
+
+Massive Dynamic is on a mission to transform how chips are verified. Our culture is collaborative, inclusive and fast-paced. We value diversity and offer competitive compensation, wellness programs and learning budgets. Apply now to be part of something big!
+
+The opportunity
+As Verification Architect you will define the verification methodology for our AI accelerator and lead the adoption of machine learning in our verification flows.
+
+You should have
+- 10+ years of design verification experience, including verification architecture ownership
+- Strong UVM and SystemVerilog
+- Hands-on experience applying machine learning to verification (e.g. test selection, coverage prediction)
+- Strong Python
+- Experience verifying NPU or AI accelerator designs
+
+Bonus points
+- Experience with LLM-based verification assistants
+- CHI or AXI interconnect verification
+- Mentoring and technical leadership
+
+Massive Dynamic does not sponsor visas for this role.

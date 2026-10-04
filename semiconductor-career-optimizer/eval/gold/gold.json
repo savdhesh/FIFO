@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "note": "Labels written from eval/GUIDELINES.md before the engine was run on any of these inputs. Dates are YYYY-MM, YYYY or Present.",
+  "resumes": [
+    { "id": "r1-ana", "split": "holdout", "name": "ANA FICTIONAL", "email": "ana.fictional@example.com", "roles": [
+      { "title": "Senior Design Verification Engineer", "employer": "Vandelay Silicon", "start": "2020-04", "end": "Present", "bullets": 4 },
+      { "title": "Design Verification Engineer", "employer": "Pied Piper Microsystems", "start": "2016-06", "end": "2020-03", "bullets": 3 } ] },
+    { "id": "r2-bo", "split": "dev", "name": "Bo Fictional", "email": "bo.fictional@example.com", "roles": [
+      { "title": "Design Verification Engineer", "employer": "Cygnus Semiconductors Pvt Ltd", "start": "2019-01", "end": "Present", "bullets": 3 },
+      { "title": "Graduate Engineer Trainee", "employer": "Orion Electronics", "start": "2017-07", "end": "2018-12", "bullets": 1 } ] },
+    { "id": "r3-chen", "split": "holdout", "name": "Chen Fictional", "email": "chen.fictional@example.com", "roles": [
+      { "title": "Staff Verification Engineer", "employer": "Kestrel Chips Pte Ltd", "start": "2019", "end": "Present", "bullets": 3 },
+      { "title": "Senior Verification Engineer", "employer": "Heron Microelectronics", "start": "2014", "end": "2019", "bullets": 2 } ] },
+    { "id": "r4-dara", "split": "dev", "name": "Dara Fictional", "email": "dara.fictional@example.com", "roles": [
+      { "title": "Functional Safety Verification Engineer", "employer": "Albatross Automotive GmbH", "start": "2019", "end": "Present", "bullets": 3 },
+      { "title": "Verification Engineer", "employer": "Pelican Elektronik AG", "start": "2015", "end": "2019", "bullets": 2 } ] },
+    { "id": "r5-eli", "split": "holdout", "name": "Eli Fictional", "email": "eli.fictional@example.com", "roles": [
+      { "title": "Senior Formal Verification Engineer", "employer": "Falcon Logic", "start": "2018-09", "end": "Present", "bullets": 3 },
+      { "title": "Verification Engineer", "employer": "Osprey Devices", "start": "2014-06", "end": "2018-08", "bullets": 2 } ] },
+    { "id": "r6-fay", "split": "dev", "name": "Fay Fictional", "email": "fay.fictional@example.com", "roles": [
+      { "title": "Lead Verification Engineer", "employer": "Example Ltd", "start": "2015-10", "end": "2020-06", "bullets": 4 },
+      { "title": "Verification Engineer", "employer": "Sample Systems Ltd", "start": "2008-09", "end": "2015-09", "bullets": 1 },
+      { "title": "Engineering Manager", "employer": "Example Ltd", "start": "2020-07", "end": "Present", "bullets": 2 } ] }
+  ],
+  "jds": [
+    { "id": "j1-pcie", "split": "holdout", "title": "Senior Design Verification Engineer", "company": "Wayne Interconnect", "seniority": "Senior", "years": 7, "requirements": [
+      { "skill": "design verification", "importance": "mandatory" }, { "skill": "SystemVerilog", "importance": "mandatory" }, { "skill": "UVM", "importance": "mandatory" },
+      { "skill": "PCIe", "importance": "mandatory" }, { "skill": "LTSSM", "importance": "mandatory" }, { "skill": "PCIe transaction layer", "importance": "mandatory" },
+      { "skill": "CXL", "importance": "mandatory" }, { "skill": "SVA", "importance": "mandatory" }, { "skill": "functional coverage", "importance": "mandatory" },
+      { "skill": "coverage closure", "importance": "implied" }, { "skill": "root-cause debugging", "importance": "implied" },
+      { "skill": "UCIe", "importance": "preferred" }, { "skill": "Python", "importance": "preferred" }, { "skill": "VCS", "importance": "preferred" }, { "skill": "Verdi", "importance": "preferred" } ] },
+    { "id": "j2-formal", "split": "dev", "title": "Staff Formal Verification Engineer", "company": "Stark Formal Labs", "seniority": "Staff", "years": 8, "requirements": [
+      { "skill": "design verification", "importance": "mandatory" }, { "skill": "formal verification", "importance": "mandatory" }, { "skill": "SVA", "importance": "mandatory" },
+      { "skill": "JasperGold", "importance": "mandatory" }, { "skill": "formal sign-off", "importance": "mandatory" }, { "skill": "cutpoints", "importance": "mandatory" },
+      { "skill": "equivalence checking", "importance": "mandatory" },
+      { "skill": "VC Formal", "importance": "preferred" }, { "skill": "mentoring", "importance": "preferred" }, { "skill": "Python", "importance": "preferred" }, { "skill": "Tcl", "importance": "preferred" } ] },
+    { "id": "j3-cpu", "split": "holdout", "title": "Principal CPU Verification Engineer", "company": "Acme Cores Ltd", "seniority": "Principal", "years": 12, "requirements": [
+      { "skill": "verification planning", "importance": "implied" }, { "skill": "ISS", "importance": "implied" }, { "skill": "instruction retirement", "importance": "implied" },
+      { "skill": "coverage closure", "importance": "implied" }, { "skill": "load store unit", "importance": "implied" }, { "skill": "MMU", "importance": "implied" },
+      { "skill": "CPU verification", "importance": "mandatory" }, { "skill": "RISC-V", "importance": "mandatory" }, { "skill": "privileged architecture", "importance": "mandatory" },
+      { "skill": "CSR", "importance": "mandatory" }, { "skill": "interrupts", "importance": "mandatory" }, { "skill": "exceptions", "importance": "mandatory" },
+      { "skill": "riscv-dv", "importance": "mandatory" }, { "skill": "SystemVerilog", "importance": "mandatory" }, { "skill": "UVM", "importance": "mandatory" },
+      { "skill": "C", "importance": "mandatory" }, { "skill": "C++", "importance": "mandatory" }, { "skill": "technical leadership", "importance": "mandatory" },
+      { "skill": "memory consistency", "importance": "preferred" }, { "skill": "formal verification", "importance": "preferred" }, { "skill": "vector extension", "importance": "preferred" } ] },
+    { "id": "j4-safety", "split": "dev", "title": "Verification Engineer", "company": "Bosch-like Automotive Fictional GmbH", "seniority": "Engineer", "years": 5, "requirements": [
+      { "skill": "ISO 26262", "importance": "mandatory" }, { "skill": "ASIL", "importance": "implied" }, { "skill": "fault injection", "importance": "mandatory" },
+      { "skill": "diagnostic coverage", "importance": "mandatory" }, { "skill": "safety mechanisms", "importance": "mandatory" },
+      { "skill": "SystemVerilog", "importance": "mandatory" }, { "skill": "UVM", "importance": "mandatory" }, { "skill": "digital verification", "importance": "mandatory" },
+      { "skill": "CAN FD", "importance": "preferred" }, { "skill": "Automotive Ethernet", "importance": "preferred" }, { "skill": "Python", "importance": "preferred" } ] },
+    { "id": "j5-soclead", "split": "holdout", "title": "SoC Verification Lead", "company": "Globex Mobile", "seniority": "Lead", "years": 10, "requirements": [
+      { "skill": "SoC verification", "importance": "mandatory" }, { "skill": "technical leadership", "importance": "mandatory" }, { "skill": "people management", "importance": "mandatory" },
+      { "skill": "verification planning", "importance": "mandatory" }, { "skill": "sign-off", "importance": "mandatory" }, { "skill": "AXI", "importance": "mandatory" },
+      { "skill": "CHI", "importance": "mandatory" }, { "skill": "emulation", "importance": "mandatory" }, { "skill": "firmware", "importance": "mandatory" },
+      { "skill": "stakeholder communication", "importance": "mandatory" }, { "skill": "UPF", "importance": "preferred" }, { "skill": "Arm", "importance": "preferred" } ] },
+    { "id": "j6-junior", "split": "dev", "title": "Design Verification Engineer", "company": "Initech India Pvt Ltd", "seniority": "Engineer", "years": 2, "requirements": [
+      { "skill": "design verification", "importance": "mandatory" }, { "skill": "SystemVerilog", "importance": "mandatory" }, { "skill": "UVM", "importance": "mandatory" },
+      { "skill": "APB", "importance": "mandatory" }, { "skill": "AHB", "importance": "mandatory" }, { "skill": "AXI", "importance": "mandatory" },
+      { "skill": "Xcelium", "importance": "mandatory" }, { "skill": "VCS", "importance": "mandatory" }, { "skill": "Python", "importance": "mandatory" }, { "skill": "Perl", "importance": "mandatory" },
+      { "skill": "I2C", "importance": "preferred" }, { "skill": "SPI", "importance": "preferred" }, { "skill": "UART", "importance": "preferred" },
+      { "skill": "functional coverage", "importance": "preferred" }, { "skill": "SVA", "importance": "preferred" } ] },
+    { "id": "j7-pd", "split": "holdout", "title": "Senior Physical Design Engineer", "company": "Hooli Silicon", "seniority": "Senior", "years": 6, "requirements": [
+      { "skill": "physical design", "importance": "mandatory" }, { "skill": "place and route", "importance": "mandatory" }, { "skill": "Innovus", "importance": "mandatory" },
+      { "skill": "ICC2", "importance": "mandatory" }, { "skill": "static timing analysis", "importance": "mandatory" }, { "skill": "PrimeTime", "importance": "mandatory" },
+      { "skill": "DRC/LVS", "importance": "mandatory" }, { "skill": "Calibre", "importance": "mandatory" }, { "skill": "Tcl", "importance": "mandatory" },
+      { "skill": "advanced nodes", "importance": "preferred" }, { "skill": "UPF", "importance": "preferred" } ] },
+    { "id": "j8-aiarch", "split": "dev", "title": "Verification Architect", "company": "Massive Dynamic Semiconductors", "seniority": "Architect", "years": 10, "requirements": [
+      { "skill": "design verification", "importance": "mandatory" }, { "skill": "verification architecture", "importance": "mandatory" }, { "skill": "UVM", "importance": "mandatory" },
+      { "skill": "SystemVerilog", "importance": "mandatory" }, { "skill": "machine learning for verification", "importance": "mandatory" }, { "skill": "Python", "importance": "mandatory" },
+      { "skill": "NPU", "importance": "mandatory" }, { "skill": "verification methodology", "importance": "implied" },
+      { "skill": "LLM-based verification assistants", "importance": "preferred" }, { "skill": "CHI", "importance": "preferred" }, { "skill": "AXI", "importance": "preferred" },
+      { "skill": "mentoring", "importance": "preferred" }, { "skill": "technical leadership", "importance": "preferred" } ] }
+  ],
+  "pairs": [
+    { "id": "p1", "resume": "r1-ana", "jd": "j1-pcie", "split": "holdout", "verdicts": ["STRONG APPLY", "APPLY"], "critical": [], "labels": {
+      "design verification": "exact", "SystemVerilog": "exact", "UVM": "exact", "PCIe": "exact", "LTSSM": "exact", "PCIe transaction layer": "exact", "CXL": "exact", "SVA": "exact",
+      "functional coverage": "exact", "coverage closure": "exact", "root-cause debugging": "exact", "UCIe": "related", "Python": "exact", "VCS": "exact", "Verdi": "exact" } },
+    { "id": "p2", "resume": "r5-eli", "jd": "j2-formal", "split": "dev", "verdicts": ["APPLY", "APPLY WITH GAPS"], "critical": ["cutpoints"], "labels": {
+      "design verification": "exact", "formal verification": "exact", "SVA": "exact", "JasperGold": "related", "formal sign-off": "exact", "cutpoints": "weak",
+      "equivalence checking": "exact", "VC Formal": "exact", "mentoring": "missing", "Python": "missing", "Tcl": "missing" } },
+    { "id": "p3", "resume": "demo", "jd": "j3-cpu", "split": "holdout", "verdicts": ["STRONG APPLY", "APPLY"], "critical": ["riscv-dv"], "labels": {
+      "verification planning": "exact", "ISS": "exact", "instruction retirement": "exact", "coverage closure": "exact", "load store unit": "weak", "MMU": "weak",
+      "CPU verification": "exact", "RISC-V": "exact", "privileged architecture": "equivalent", "CSR": "exact", "interrupts": "exact", "exceptions": "exact",
+      "riscv-dv": "weak", "SystemVerilog": "exact", "UVM": "exact", "C": "exact", "C++": "related", "technical leadership": "exact",
+      "memory consistency": "missing", "formal verification": "exact", "vector extension": "missing" } },
+    { "id": "p4", "resume": "r4-dara", "jd": "j4-safety", "split": "dev", "verdicts": ["STRONG APPLY", "APPLY"], "critical": [], "labels": {
+      "ISO 26262": "exact", "ASIL": "exact", "fault injection": "exact", "diagnostic coverage": "exact", "safety mechanisms": "exact",
+      "SystemVerilog": "exact", "UVM": "exact", "digital verification": "exact", "CAN FD": "exact", "Automotive Ethernet": "missing", "Python": "missing" } },
+    { "id": "p5", "resume": "r6-fay", "jd": "j5-soclead", "split": "holdout", "verdicts": ["STRONG APPLY", "APPLY"], "critical": ["stakeholder communication"], "labels": {
+      "SoC verification": "exact", "technical leadership": "exact", "people management": "exact", "verification planning": "exact", "sign-off": "exact",
+      "AXI": "exact", "CHI": "exact", "emulation": "exact", "firmware": "exact", "stakeholder communication": "weak", "UPF": "missing", "Arm": "exact" } },
+    { "id": "p6", "resume": "r2-bo", "jd": "j6-junior", "split": "dev", "verdicts": ["STRONG APPLY", "APPLY", "APPLY WITH GAPS"], "critical": ["Perl"], "labels": {
+      "design verification": "exact", "SystemVerilog": "exact", "UVM": "exact", "APB": "exact", "AHB": "related", "AXI": "exact", "Xcelium": "exact", "VCS": "related",
+      "Python": "exact", "Perl": "missing", "I2C": "related", "SPI": "exact", "UART": "exact", "functional coverage": "missing", "SVA": "missing" } },
+    { "id": "p7", "resume": "demo", "jd": "j7-pd", "split": "holdout", "verdicts": ["DO NOT APPLY", "LOW PRIORITY"], "critical": ["physical design", "place and route", "Innovus", "ICC2", "static timing analysis", "PrimeTime", "DRC/LVS", "Calibre"], "labels": {
+      "physical design": "missing", "place and route": "missing", "Innovus": "missing", "ICC2": "missing", "static timing analysis": "missing", "PrimeTime": "missing",
+      "DRC/LVS": "missing", "Calibre": "missing", "Tcl": "exact", "advanced nodes": "missing", "UPF": "missing" } },
+    { "id": "p8", "resume": "r3-chen", "jd": "j8-aiarch", "split": "dev", "verdicts": ["STRONG APPLY", "APPLY"], "critical": [], "labels": {
+      "design verification": "exact", "verification architecture": "exact", "UVM": "exact", "SystemVerilog": "exact", "machine learning for verification": "exact", "Python": "exact",
+      "NPU": "exact", "verification methodology": "weak", "LLM-based verification assistants": "related", "CHI": "exact", "AXI": "exact", "mentoring": "missing", "technical leadership": "weak" } }
+  ],
+  "claims": [
+    { "profile": "demo", "split": "dev", "text": "Owned the UVM verification architecture for a multi-block automotive SoC subsystem, including agents, scoreboards, reference models, register model and functional coverage.", "gold": ["VERIFIED"] },
+    { "profile": "demo", "split": "dev", "text": "Led a team of 6 engineers through coverage closure and regression debug using Xcelium and Verdi.", "gold": ["VERIFIED"] },
+    { "profile": "demo", "split": "dev", "text": "Verified PCIe and AXI interfaces at SoC level.", "gold": ["SUPPORTED", "VERIFIED"] },
+    { "profile": "demo", "split": "dev", "text": "Built a RISC-V CPU verification environment with ISS comparison against Spike.", "gold": ["SUPPORTED", "VERIFIED"] },
+    { "profile": "demo", "split": "dev", "text": "Performed formal verification using JasperGold.", "gold": ["UNSUPPORTED"] },
+    { "profile": "demo", "split": "dev", "text": "Improved regression throughput by 40% with Python automation.", "gold": ["UNSUPPORTED"] },
+    { "profile": "demo", "split": "dev", "text": "Led a team of 12 engineers.", "gold": ["UNSUPPORTED"] },
+    { "profile": "demo", "split": "dev", "text": "Verified CXL and UCIe interfaces.", "gold": ["UNSUPPORTED"] },
+    { "profile": "demo", "split": "dev", "text": "ISO 26262 certified functional safety engineer.", "gold": ["UNSUPPORTED"] },
+    { "profile": "demo", "split": "dev", "text": "Defined the verification plan and coverage strategy for ASIL-B safety-critical IP.", "gold": ["VERIFIED", "SUPPORTED"] },
+    { "profile": "demo", "split": "dev", "text": "Hands-on experience with SystemVerilog, UVM, SVA and functional coverage.", "gold": ["SUPPORTED"] },
+    { "profile": "demo", "split": "dev", "text": "Background includes verification planning and sign-off.", "gold": ["INFERRED"] },
+    { "profile": "demo", "split": "dev", "text": "Managed a team of 6 engineers, including hiring and performance reviews.", "gold": ["UNSUPPORTED"] },
+    { "profile": "demo", "split": "dev", "text": "Wrote SystemVerilog assertions (SVA) and performed formal property checking using Questa Formal.", "gold": ["VERIFIED"] },
+    { "profile": "demo", "split": "dev", "text": "Verified Ethernet MAC and SerDes interfaces.", "gold": ["SUPPORTED"] },
+    { "profile": "demo", "split": "dev", "text": "Taped out 5 automotive SoCs.", "gold": ["UNSUPPORTED"] },
+    { "profile": "demo", "split": "dev", "text": "Developed reusable UVM verification infrastructure and VIP shared by several IP teams.", "gold": ["VERIFIED"] },
+    { "profile": "demo", "split": "dev", "text": "Experienced with Cadence JasperGold and Synopsys VC Formal.", "gold": ["UNSUPPORTED"] },
+    { "profile": "demo", "split": "dev", "text": "Principal Verification Engineer with 13+ years in SoC, IP and CPU verification.", "gold": ["SUPPORTED"] },
+    { "profile": "demo", "split": "dev", "text": "Principal Verification Engineer with 18 years of experience.", "gold": ["UNSUPPORTED"] },
+    { "profile": "demo", "split": "dev", "text": "Mentored junior engineers on UVM best practices.", "gold": ["INFERRED"] },
+    { "profile": "demo", "split": "dev", "text": "Holds a patent on coverage-driven verification.", "gold": ["UNSUPPORTED"] },
+    { "profile": "demo", "split": "dev", "text": "Worked at Intel Corporation on CPU validation.", "gold": ["UNSUPPORTED"] },
+    { "profile": "demo", "split": "dev", "text": "Wrote C and Tcl utilities for debug.", "gold": ["SUPPORTED", "VERIFIED"] },
+    { "profile": "demo", "split": "dev", "text": "Verified AHB and APB peripherals and an ARM-based subsystem.", "gold": ["SUPPORTED", "VERIFIED"] },
+    { "profile": "demo", "split": "dev", "text": "Verified DDR5 memory controllers.", "gold": ["UNSUPPORTED"] },
+    { "profile": "demo", "split": "dev", "text": "Built Python and Perl regression automation used across multiple projects.", "gold": ["SUPPORTED", "VERIFIED"] },
+    { "profile": "demo", "split": "dev", "text": "Performed gate-level simulation for an ASIL-B SoC.", "gold": ["SUPPORTED"] },
+    { "profile": "demo", "split": "dev", "text": "Owned post-silicon bring-up of the SoC.", "gold": ["UNSUPPORTED"] },
+    { "profile": "demo", "split": "dev", "text": "Reduced simulation time 3x by optimizing the testbench.", "gold": ["UNSUPPORTED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "Wrote SVA properties and assumptions for arbiters, FIFOs and cache controllers.", "gold": ["VERIFIED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "Ran property checking in VC Formal and debugged counterexamples.", "gold": ["VERIFIED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "Signed off formal coverage for three IP blocks.", "gold": ["VERIFIED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "Formal verification engineer experienced with VC Formal and Formality.", "gold": ["SUPPORTED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "Expert JasperGold user.", "gold": ["UNSUPPORTED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "Performed equivalence checking with Formality.", "gold": ["SUPPORTED", "VERIFIED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "Developed UVM scoreboards for an Ethernet MAC.", "gold": ["VERIFIED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "Verified PCIe controllers with UVM.", "gold": ["UNSUPPORTED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "Led a formal verification team of 4.", "gold": ["UNSUPPORTED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "Achieved 100% proof convergence on all blocks.", "gold": ["UNSUPPORTED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "Experience with formal sign-off.", "gold": ["SUPPORTED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "Used cutpoints and abstraction to converge proofs.", "gold": ["INFERRED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "Applied formal verification to cache controllers.", "gold": ["SUPPORTED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "Holds an M.S. in Electrical Engineering.", "gold": ["SUPPORTED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "Holds a PhD in formal methods.", "gold": ["UNSUPPORTED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "10 years of verification experience.", "gold": ["SUPPORTED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "Formally verified RISC-V cores.", "gold": ["UNSUPPORTED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "Wrote Tcl scripts to automate formal runs.", "gold": ["UNSUPPORTED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "Experience with SystemVerilog and UVM.", "gold": ["SUPPORTED"] },
+    { "profile": "r5-eli", "split": "holdout", "text": "Defined the formal verification methodology for the company.", "gold": ["INFERRED"] }
+  ]
+}

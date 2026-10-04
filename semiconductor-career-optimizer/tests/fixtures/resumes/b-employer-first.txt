@@ -1,0 +1,21 @@
+LEE FICTIONAL
+Munich, Germany | lee.f@example.com | github.com/leef-demo
+
+PROFESSIONAL EXPERIENCE
+
+Northern Chips GmbH — Munich, Germany
+Principal Verification Engineer, Sep 2018 to Present
+• Defined the verification strategy for an ASIL-D safety MCU, including fault injection campaigns.
+• Led a team of 5 verification engineers.
+• Gate-level simulation sign-off with VCS.
+
+Senior Verification Engineer, Jan 2014 – Aug 2018
+• Verified SPI, I2C and UART peripherals using UVM.
+• Developed C-based firmware tests.
+
+Southern Silicon Ltd — Dresden, Germany
+Verification Engineer, 2010 – 2013
+• Block-level verification in Verilog.
+
+EDUCATION
+M.Sc. Electrical Engineering, Example Technical University, 2010

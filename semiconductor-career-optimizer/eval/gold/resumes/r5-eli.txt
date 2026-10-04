@@ -1,0 +1,21 @@
+Eli Fictional
+eli.fictional@example.com | Austin, TX
+
+EXPERIENCE
+
+Falcon Logic (Austin) — Senior Formal Verification Engineer
+September 2018 – present
+- Wrote SVA properties and assumptions for arbiters, FIFOs and cache controllers.
+- Ran property checking in VC Formal and debugged counterexamples.
+- Signed off formal coverage for three IP blocks.
+
+Osprey Devices (Dallas) — Verification Engineer
+June 2014 – August 2018
+- Developed UVM scoreboards for an Ethernet MAC.
+- Performed equivalence checking with Formality on synthesized netlists.
+
+EDUCATION
+M.S. Electrical Engineering, Example University, 2014
+
+SKILLS
+SVA, formal property verification, VC Formal, Formality, UVM, SystemVerilog, Ethernet

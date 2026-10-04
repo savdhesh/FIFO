@@ -1,0 +1,15 @@
+Senior Design Verification Engineer – PCIe/CXL
+Wayne Interconnect · San Jose, CA (Hybrid)
+
+Wayne Interconnect builds high-bandwidth connectivity silicon for data centers. We are a fast-growing team that values ownership and curiosity, and we offer competitive pay, equity and great benefits.
+
+What you'll do
+You will own block- and subsystem-level verification of our PCIe Gen5/Gen6 controller, drive coverage closure and work closely with designers to root-cause failures.
+
+What you bring
+You have 7+ years of hands-on ASIC design verification experience. You have strong SystemVerilog and UVM skills and deep knowledge of PCIe, including LTSSM and the transaction layer. Experience with CXL is required. You are comfortable writing SVA and building functional coverage models.
+
+Nice to have
+Familiarity with UCIe. Python scripting. Experience with Synopsys VCS and Verdi.
+
+Wayne Interconnect is an equal opportunity employer.

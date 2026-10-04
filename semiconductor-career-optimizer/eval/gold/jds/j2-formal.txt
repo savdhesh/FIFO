@@ -1,0 +1,19 @@
+Staff Formal Verification Engineer
+Stark Formal Labs — Austin, TX
+
+About the role
+Join our formal methods team to sign off control-heavy IP using formal property verification.
+
+Requirements
+- 8+ years in ASIC verification, with at least 4 in formal verification
+- Expert-level SVA: properties, assumptions and covers
+- Hands-on JasperGold experience
+- Formal sign-off methodology, including proof convergence techniques (abstraction, cutpoints)
+- Equivalence checking experience
+
+Preferred qualifications
+- VC Formal
+- Experience mentoring engineers in formal methods
+- Python or Tcl scripting
+
+Benefits: health, dental, 401(k).

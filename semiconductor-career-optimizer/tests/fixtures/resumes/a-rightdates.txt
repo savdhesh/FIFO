@@ -1,0 +1,27 @@
+Priya Fictional
+Senior Design Verification Engineer
+Hyderabad, Telangana, India  •  priya.f@example.com  •  +91-90000-11111
+https://www.linkedin.com/in/priya-fictional
+
+SUMMARY
+Design verification engineer, 9 years, CPU and interconnect.
+
+WORK EXPERIENCE
+
+Staff Verification Engineer                                              03/2020 – Present
+Globex Microsystems, Hyderabad, India
+ UVM environment architecture for an ARMv8 CPU cluster; owned scoreboard and reference model.
+ Drove coverage closure and regression triage across 4 IP teams.
+ Verified CHI and AXI interconnect with Xcelium.
+
+Senior Verification Engineer                                             07/2016 – 02/2020
+Initech Semiconductors Pvt. Ltd., Bengaluru, India
+ Built SystemVerilog testbenches for DDR controller IP.
+ Wrote Python scripts for regression automation.
+
+EDUCATION
+Master of Technology (VLSI Design), Example Institute of Technology — 2016
+Bachelor of Engineering (ECE), Sample University — 2014
+
+SKILLS
+SystemVerilog, UVM, SVA, Python, Perl; Xcelium, VCS, Verdi; ARM, AXI, CHI, DDR

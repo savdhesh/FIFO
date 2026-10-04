@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String          @id @default(cuid())
+  email        String          @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime        @default(now())
+  resumes      ResumeFile[]
+  state        UserState?
+}
+
+/// The workspace state (profile, parsed resumes, applications, prefs) as one validated document per user.
+model UserState {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data      Json
+  updatedAt DateTime @updatedAt
+}
+
+/// Uploaded master resume. File bytes live in private storage, never at a public URL.
+model ResumeFile {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename   String
+  mime       String
+  size       Int
+  storageKey String
+  rawText    String @default("")
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+

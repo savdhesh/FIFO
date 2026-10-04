@@ -1,0 +1,24 @@
+Principal Design Verification Engineer
+Acme Silicon
+Location: Austin, TX
+
+About Acme Silicon
+We are a fast-paced company offering competitive salary and benefits. Equal opportunity employer.
+
+Responsibilities
+- Define the verification architecture and own the UVM environment for a RISC-V CPU subsystem.
+- Drive coverage closure and root-cause debug of complex failures.
+- Mentor junior engineers and collaborate with design and architecture teams.
+
+Requirements
+- 10+ years of experience in pre-silicon design verification.
+- Strong SystemVerilog and UVM skills; hands-on constrained random verification and functional coverage.
+- Experience with RISC-V processor verification, including CSR and interrupt verification.
+- Formal verification experience.
+- BS/MS in Electrical Engineering or related field.
+
+Preferred
+- JasperGold experience is a plus.
+- Python scripting for regression automation.
+- Knowledge of PCIe or CXL.
+- Must be eligible to work in the United States.

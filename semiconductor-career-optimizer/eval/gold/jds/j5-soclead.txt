@@ -1,0 +1,16 @@
+SoC Verification Lead
+Globex Mobile — Bristol, UK
+
+The SoC Verification Lead will lead a team of 6–10 engineers responsible for full-chip verification of our next mobile SoC.
+
+Key requirements:
+* 10+ years of SoC verification experience, 3+ years leading teams
+* People management: hiring, performance reviews, career development
+* Ownership of the SoC verification plan and sign-off for tape-out
+* Strong knowledge of AMBA protocols (AXI, CHI)
+* Experience with emulation (Palladium or ZeBu) and firmware-driven testing
+* Excellent stakeholder communication
+
+Desirable:
+* Low-power verification (UPF)
+* Arm-based SoC experience

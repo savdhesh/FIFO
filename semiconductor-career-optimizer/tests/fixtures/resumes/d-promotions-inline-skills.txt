@@ -1,0 +1,21 @@
+Jordan Fictional — Verification Architect
+Austin, TX 78701 · jordan.f@example.com · 512-555-0100
+
+TECHNICAL EXPERTISE
+Languages: SystemVerilog, C/C++, Python, Tcl
+Verification: UVM, constrained random, functional coverage, formal (FPV), GLS
+Protocols: PCIe, CXL, USB3, Ethernet
+Tools: VCS, Verdi, Questa, JasperGold
+
+CAREER HISTORY
+Contoso Silicon, Austin, TX
+Verification Architect (2021 – Present)
+  - Architected the reusable UVM framework adopted by 4 programs.
+  - Owned verification signoff for a CXL controller.
+Principal Engineer (2018 – 2021)
+  - Led full-chip verification of a PCIe Gen5 switch.
+Senior Engineer (2013 – 2018)
+  - Block-level verification of USB3 PHY interface logic.
+
+EDUCATION
+MS Computer Engineering — Example State University (2013)

@@ -1,0 +1,12 @@
+Quinn Fictional
+Singapore | quinn.f@example.com
+
+WORK EXPERIENCE
+Example Fabless Pte Ltd | Principal Design Verification Engineer | Jan 2018 – Present
+– Architected the UVM framework for a multi-die SoC and defined coverage strategy.
+– Verified UCIe die-to-die links with a custom scoreboard.
+Sample Silicon Pte Ltd | Senior DV Engineer | Aug 2012 – Dec 2017
+– Verified Ethernet MAC and SerDes interfaces; wrote Python regression scripts.
+
+EDUCATION
+M.Eng Microelectronics, Example University Singapore, 2012

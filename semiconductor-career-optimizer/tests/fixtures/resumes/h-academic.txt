@@ -1,0 +1,24 @@
+Dr. Riya Fictional
+Bengaluru, India | riya.f@example.com
+
+SUMMARY
+Verification researcher turned engineer, 8 years.
+
+EXPERIENCE
+Senior Research Engineer, Example Research Labs, Bengaluru (2018–Present)
+- Developed formal property checking flows for RISC-V cores using Questa Formal and SVA.
+- Mentored 4 interns on UVM environment bring-up.
+
+Verification Engineer, Sample Devices, Pune (2016–2018)
+- Wrote SystemVerilog assertions for AHB bridges.
+
+EDUCATION
+Ph.D. Electronics, Example Institute of Science, 2016
+M.Tech VLSI, Example Institute of Technology, 2012
+
+PUBLICATIONS & PATENTS
+- "Property checking of RISC-V pipelines", Example Verification Conference, 2019
+- Patent: Method for coverage-guided formal checking (filed 2020)
+
+AWARDS
+Best Paper Award, Example Verification Conference, 2019
