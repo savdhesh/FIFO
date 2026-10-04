@@ -177,3 +177,24 @@ describe("generated skills section", async () => {
     expect(items.filter((x) => /^(GLS|Gate-Level Simulation)$/.test(x))).toHaveLength(1);
   });
 });
+
+describe("date formats seen on real resumes", () => {
+  it.each([
+    ["Nov-2017 – Dec-2019", "Nov-2017", "Dec-2019"], ["Nov-17 to Dec-19", "Nov-17", "Dec-19"], ["November, 2017 – Till Now", "November, 2017", "Present"],
+    ["2017-11 – 2019-12", "2017-11", "2019-12"], ["04-2024 – Present", "04-2024", "Present"], ["Apr 2024 − Present", "Apr 2024", "Present"],
+    ["Apr 2024 - Continuing", "Apr 2024", "Present"], ["Jan 2020 ~ Mar 2021", "Jan 2020", "Mar 2021"], ["Jun 2016 through Oct 2017", "Jun 2016", "Oct 2017"],
+    ["Since Apr 2024", "Apr 2024", "Present"], ["From: 04/2024 To: Present", "04/2024", "Present"], ["Apr 2024 –\nPresent", "Apr 2024", "Present"],
+  ])("%s", (dates, start, end) => {
+    const p = parseResumeHeuristic(`Test Person\ntest@example.com\n\nEXPERIENCE\nSenior DV Engineer, Acme Silicon\n${dates}\n• Built UVM testbenches for AXI.\n`);
+    expect(p.roles).toHaveLength(1);
+    expect([p.roles[0].startDate, p.roles[0].endDate]).toEqual([start, end]);
+  });
+  it("month names only count at a word start ('Grammar 2019' is not March)", () => {
+    expect(parseResumeHeuristic("T\nt@example.com\n\nEXPERIENCE\nGrammar School 2019 – 2020\n• Studied.\n").roles.every((r) => !/mar/i.test(r.startDate))).toBe(true);
+  });
+  it("'04-2024' is April, not January", async () => {
+    const { parseYM } = await import("@/lib/parsing/dates");
+    expect(parseYM("04-2024")).toEqual({ y: 2024, m: 4 });
+    expect(parseYM("Nov-17")).toEqual({ y: 2017, m: 11 });
+  });
+});

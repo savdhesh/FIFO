@@ -60,7 +60,8 @@ Rows 35–47 come from a real user's generated output (two resumes merged, expor
 | 43 | Project/programme lines ("Automotive SerDes Alliance (ASA) Verification IP") were bullets. | Kept as the role's project line, shown under the role header in preview, PDF and DOCX. |
 | 44 | "Qualcomm India Pvt. Ltd." ended with a dot, so the header was read as a sentence and the role lost title and employer. | Company-suffix dots are not sentence ends. |
 | 45 | Generated skills listed one skill several ways ("AHB" / "AMBA AHB", "GLS" / "Gate-Level Simulation", "SoC" / "SoC Verification"). | One entry per concept; distinct protocol variants (QSPI vs SPI, I3C vs I2C) and qualifiers kept. |
-| 46 | A non-resume document (interview notes) could be added to the library and merged. | Documents with no dated roles are refused with an explanation. |
+| 46 | A non-resume document (interview notes) could be added to the library and merged. First fix refused such files outright, which also blocked a real resume whose dates were not recognised. | Files with no dated jobs are added with a "no jobs found" warning and left out of Build while other resumes have jobs. |
+| 48 | Common date formats were not recognised: "Nov-2017", "Nov-17", "November, 2017", ISO "2017-11", "Since Apr 2024", "From: 04/2024 To: Present", "Till Now", "Continuing", "~", "through", a range wrapped over two lines; "04-2024" was read as January. | Date grammar extended; month names must start a word ("Grammar 2019" is not March). |
 | 47 | "Electronics & Communication" (a degree) counted as the soft skill "Communication" in truth checks. | Degree names excluded from term matching. |
 
 ## Spec coverage (brief sections)
@@ -96,7 +97,7 @@ Legend: ✅ done · 🟡 partial · ⛔ not built
 | 32 | Demo data | ✅ | Fictional. |
 | 33 | Security | ✅ | Server app. |
 | 35 | Acceptance scenario | ✅ | `tests/acceptance.test.ts`. |
-| 37 | Tests, README, schema, migrations, seed | ✅ | 250 unit tests + browser e2e scripts. |
+| 37 | Tests, README, schema, migrations, seed | ✅ | 264 unit tests + browser e2e scripts. |
 
 ## Known limits that remain
 - **Separate GitHub repo**: the GitHub integration returned 403 on repo creation; the project is a self-contained folder in `savdhesh/FIFO`.

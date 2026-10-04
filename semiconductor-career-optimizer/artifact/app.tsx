@@ -138,15 +138,15 @@ function ProfileView({ profile, setProfile, resumes, setResumes, provider, run, 
     const dup = existing.find((r) => r.hash === hash);
     if (dup) return { all: existing, added: false };
     const parsed = await parseResume(provider, text);
-    // Notes, prep documents and job descriptions have no dated roles; merging them pollutes the profile (e.g. education).
-    if (!parsed.profile.roles.length) throw new Error(`${name}: no jobs with dates were found, so this does not look like a resume (or its layout could not be read). Nothing was added. If it is a resume, paste its text instead and check the dates are written like "Jan 2020 – Present".`);
     return { all: [...existing, { id: `res${Date.now().toString(36)}${existing.length}`, name, addedAt: new Date().toISOString(), profile: parsed.profile, ats: atsParse(text, layout), diag: { ...parsed.diag, unplaced: parsed.diag.unplaced }, source: parsed.source, hash }], added: true };
   };
   const afterAdd = (all: Resume[], added: number, skipped: string[]) => {
     setResumes(() => all);
     const waiting = all.filter((r) => !r.mergedAt).length;
     const dupNote = skipped.length ? ` Skipped ${skipped.join(", ")}: already in your library.` : "";
-    if (added) say("ok", `Added ${added} resume${added > 1 ? "s" : ""}. ${waiting} ready to ${profile ? "merge" : "build your profile from"}. Add more from anywhere, then select ${profile ? "Merge into profile" : "Build profile"} when you are done.${dupNote}`);
+    const noJobs = all.slice(-added).filter((r) => !r.profile.roles.length).map((r) => r.name);
+    if (noJobs.length) say("err", `${noJobs.join(", ")}: added, but no jobs with dates were found. If it is a resume, its date format or layout was not recognised: open Check parse, or paste the text, or tell us the date format. If it is notes or a job description, remove it. It will not be merged while other resumes have jobs.${dupNote}`);
+    else if (added) say("ok", `Added ${added} resume${added > 1 ? "s" : ""}. ${waiting} ready to ${profile ? "merge" : "build your profile from"}. Add more from anywhere, then select ${profile ? "Merge into profile" : "Build profile"} when you are done.${dupNote}`);
     else if (skipped.length) say("err", `Nothing added.${dupNote}`);
   };
   const onFiles = (files: File[]) => {
@@ -171,17 +171,22 @@ function ProfileView({ profile, setProfile, resumes, setResumes, provider, run, 
   // Step 2: build. Runs once you have added everything: the strongest resume becomes the base, the rest are proposed as additions.
   const build = () => {
     if (!resumes.length) return;
-    const src = resumes.map((x: Resume) => ({ id: x.id, name: x.name, profile: x.profile }));
+    // A document with no dated jobs (notes, a prep sheet, an unreadable layout) is left out while any resume has jobs.
+    const withJobs = resumes.filter((x: Resume) => x.profile.roles.length);
+    const use: Resume[] = withJobs.length ? withJobs : resumes;
+    const left = resumes.filter((x: Resume) => !use.includes(x)).map((x: Resume) => x.name);
+    const src = use.map((x: Resume) => ({ id: x.id, name: x.name, profile: x.profile }));
     let base = profile;
     if (!base) { const r0 = mergeResumes(src); base = r0.base; setProfile(base); }
     const r = mergeResumes(src, base);
     const now = new Date().toISOString();
-    setResumes((xs: Resume[]) => xs.map((x) => (x.mergedAt ? x : { ...x, mergedAt: now })));
+    setResumes((xs: Resume[]) => xs.map((x) => (x.mergedAt || !use.includes(x) ? x : { ...x, mergedAt: now })));
     setReview(null);
-    if (resumes.length > 1 || profile) { setReport(r); setItems(r.items); }
-    say("ok", profile
+    if (use.length > 1 || profile) { setReport(r); setItems(r.items); }
+    const leftNote = left.length ? ` Left out (no jobs found): ${left.join(", ")}.` : !withJobs.length ? " No jobs were found in any file: add your roles with + Add role below." : "";
+    say(withJobs.length ? "ok" : "err", (profile
       ? `${pending.length} new resume(s) compared with your profile: ${r.items.length} proposed change(s). Nothing is applied until you accept it.`
-      : `Profile built from ${r.analysis.baseName}${resumes.length > 1 ? `; ${r.items.length} addition(s) from your other ${resumes.length - 1} resume(s) to review below` : ""}. Correct anything the parser got wrong.`);
+      : `Profile built from ${r.analysis.baseName}${use.length > 1 ? `; ${r.items.length} addition(s) from your other ${use.length - 1} resume(s) to review below` : ""}. Correct anything the parser got wrong.`) + leftNote);
   };
 
   const setResumeProfile = (id: string) => (p: Profile) => setResumes((xs: Resume[]) => xs.map((x) => (x.id === id ? { ...x, profile: p } : x)));
@@ -211,7 +216,7 @@ function ProfileView({ profile, setProfile, resumes, setResumes, provider, run, 
         <details><summary className="cursor-pointer text-sm underline">Paste resume text instead</summary><Textarea id="resume-paste" aria-label="Resume text" rows={8} className="mt-2" value={paste} onChange={(e) => setPaste(e.target.value)} /><Button className="mt-2" variant="outline" disabled={paste.length < 50} onClick={() => run("Parsing…", async () => { const r = await addResume(`pasted-${resumes.length + 1}.txt`, paste, resumes); afterAdd(r.all, r.added ? 1 : 0, r.added ? [] : ["the pasted text"]); setPaste(""); })}>Add pasted resume</Button></details>
         {resumes.length > 0 && <ul className="divide-y divide-line rounded-md border border-line text-sm">{resumes.map((r: Resume) => <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 p-2">
           <span className="min-w-0"><b>{r.name}</b> <span className="text-gray-500">· {r.profile.roles.length} roles, {r.profile.roles.reduce((a, x) => a + x.responsibilities.length + x.achievements.length, 0)} bullets · {latestRoleTitle(r.profile)}</span>{" "}
-            <Badge tone={r.mergedAt ? "gray" : "blue"}>{r.mergedAt ? "in profile" : "ready"}</Badge>{" "}
+            {r.profile.roles.length ? <Badge tone={r.mergedAt ? "gray" : "blue"}>{r.mergedAt ? "in profile" : "ready"}</Badge> : <Badge tone="red">no jobs found</Badge>}{" "}
             {r.diag && <Badge tone={r.diag.confidence === "High" ? "green" : r.diag.confidence === "Medium" ? "amber" : "red"}>parse {r.diag.confidence.toLowerCase()}</Badge>}{" "}
             {r.ats && <span title={r.ats.checks.filter((c) => c.status !== "pass").map((c) => `${c.label}: ${c.detail}`).join("\n") || "No ATS issues found"}><Badge tone={r.ats.risk === "Low" ? "green" : r.ats.risk === "Medium" ? "amber" : "red"}>ATS {r.ats.risk}</Badge></span>}</span>
           <span className="flex gap-3">{r.diag && <button className="text-xs underline" onClick={() => setReview({ id: r.id, name: r.name, diag: r.diag!, source: r.source ?? "built-in engine" })}>Check parse</button>}

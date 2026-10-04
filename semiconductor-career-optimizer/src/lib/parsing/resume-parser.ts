@@ -1,6 +1,6 @@
 import { ProfileSchema, type Profile, type Role, type SkillCategory } from "../types";
 import { ontology } from "../ontology/ontology";
-import { DATE_RANGE_RE } from "./dates";
+import { DATE_RANGE_RE, PRESENT, normalizeDatePhrases } from "./dates";
 
 const BULLET_RE = /^\s*(?:[•●▪■◦○·*\-–—>\uF000-\uF0FF]|\d+[.)]|o(?=\s+[A-Z]))\s+/;
 const SECTION_PATTERNS: [string, RegExp][] = [
@@ -167,7 +167,7 @@ function stripDate(line: string) {
   const m = line.match(DATE_RANGE_RE);
   if (!m) return { rest: line, start: "", end: "" };
   const rest = line.replace(m[0], " ").replace(/\(\s*\)|\[\s*\]/g, " ").replace(/[(|,–—\-\s]+$/g, "").replace(/^[|,–—\-\s]+/, "").replace(/\s+/g, " ").trim();
-  return { rest, start: m[1].trim(), end: /^(?:present|current|currently|now|till date|to date|ongoing|heute|bis heute|aktuell|aujourd.hui|actuel|actuellement|heden|nu|nuvarande|pågående|presente|actualidad|hoy)$/i.test(m[2].trim()) ? "Present" : m[2].trim() };
+  return { rest, start: m[1].trim(), end: new RegExp(`^${PRESENT}$`, "i").test(m[2].trim()) ? "Present" : m[2].trim() };
 }
 
 function splitHeader(parts: string[]) {
@@ -507,7 +507,7 @@ function normalizeLabels(text: string): string {
 
 export function parseResumeHeuristic(rawIn: string): Profile {
   const raw = deinterleaveColumns(rawIn);
-  const text = normalizeLabels(collapseTableLabels(dropPageFurniture(normalizeText(raw))));
+  const text = normalizeLabels(collapseTableLabels(dropPageFurniture(normalizeDatePhrases(normalizeText(raw)))));
   const { head, sections } = splitSections(text);
   const roles = parseRoles(sections.experience ?? []);
   const edu = parseEducation(sections.education ?? []);
