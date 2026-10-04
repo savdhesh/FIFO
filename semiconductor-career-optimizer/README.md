@@ -8,7 +8,7 @@ Truth-protected resume tailoring, job-match analysis and cover-letter generation
 See [AUDIT.md](AUDIT.md): what was tested, 15 defects found and fixed, and a requirement-by-requirement coverage table with what is still partial or unverified.
 
 ## Measured accuracy
-`npm run eval` scores the engines against a hand-labelled gold set (6 resumes, 8 JDs, 109 requirement labels, 50 truth claims) with a dev/holdout split. Holdout, never tuned against: parser roles/dates 100%, role employer 50%, JD requirement recall 78%, match-type 88%, overclaim 6%, verdicts 4/4, truth blocked recall 86% with a 5% leak rate (degree claims are not checked yet). Method, numbers and open failures are in [eval/README.md](eval/README.md).
+`npm run eval` scores the engines against a hand-labelled gold set (6 resumes, 8 JDs, 109 requirement labels, 50 truth claims) with a dev/holdout split. Holdout, never tuned against: parser roles/dates 100%, role employer 50%, JD requirement recall 78%, match-type 88%, overclaim 6%, verdicts 4/4, truth blocked recall 86% with a 5% leak rate before degree claims were checked (that fix closed the leak but contaminates the holdout truth split). Method, numbers and open failures are in [eval/README.md](eval/README.md).
 
 ## ATS check, credibility, strategy, themes, versions
 - **ATS check** (`src/lib/ats`): simulates a text-extracting parser on an uploaded or exported resume (reading order, contact/section/date parsing, columns, icons, tables, font size, images, pages) and shows exactly what was extracted with a Low/Medium/High risk.

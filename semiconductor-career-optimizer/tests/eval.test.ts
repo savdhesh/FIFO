@@ -14,7 +14,7 @@ describe("gold-set evaluation floors", () => {
   it("truth: no dev leaks, every dev UNSUPPORTED claim blocked", () => {
     expect(r.truth.blockedRecall.dev.rate).toBe(1);
     expect(r.truth.overclaim.dev.rate).toBe(0);
-    expect(r.truth.blockedRecall.holdout.rate).toBeGreaterThanOrEqual(6 / 7);
+    expect(r.truth.blockedRecall.holdout.rate).toBe(1); // contaminated after the degree fix; kept as a regression floor
   });
   it("parser: every gold role found", () => {
     expect(r.parse.roleFound.dev.rate).toBe(1);
@@ -31,3 +31,19 @@ describe("gold-set evaluation floors", () => {
     expect(r.jd.recall.holdout.rate).toBeGreaterThanOrEqual(46 / 59);
   });
 }, 60_000);
+
+describe("degree claims", async () => {
+  const { parseResumeHeuristic } = await import("../src/lib/parsing/resume-parser");
+  const { buildIndex } = await import("../src/lib/profile-index");
+  const { checkClaim } = await import("../src/lib/truth/truth");
+  const { DEMO_RESUME_TEXT } = await import("../src/lib/demo");
+  const index = buildIndex(parseResumeHeuristic(DEMO_RESUME_TEXT)); // M.Tech + B.E.
+  it.each([
+    ["Holds a PhD in formal methods.", "UNSUPPORTED"],
+    ["Ph.D. candidate in EE.", "UNSUPPORTED"],
+    ["Holds an MBA.", "UNSUPPORTED"],
+    ["Holds a master's degree in VLSI.", "SUPPORTED"],
+    ["Bachelor of Engineering in Electronics.", "SUPPORTED"],
+    ["Ran MS Office reports.", "SUPPORTED"],
+  ])("%s -> %s", (text, want) => expect(checkClaim(text, { index }).status).toBe(want));
+});

@@ -1,7 +1,7 @@
 {
   "goldVersion": 1,
   "goldCommit": "1afdff3",
-  "engineCommit": "fb8d1ca",
+  "engineCommit": "cec4da9 + uncommitted engine changes",
   "parse": {
     "name": {
       "dev": {
@@ -431,9 +431,9 @@
         "rate": 1
       },
       "holdout": {
-        "ok": 16,
+        "ok": 17,
         "n": 20,
-        "rate": 0.8
+        "rate": 0.85
       }
     },
     "blockedRecall": {
@@ -443,9 +443,9 @@
         "rate": 1
       },
       "holdout": {
-        "ok": 6,
+        "ok": 7,
         "n": 7,
-        "rate": 0.8571428571428571
+        "rate": 1
       }
     },
     "falseBlock": {
@@ -467,9 +467,9 @@
         "rate": 0
       },
       "holdout": {
-        "ok": 1,
+        "ok": 0,
         "n": 20,
-        "rate": 0.05
+        "rate": 0
       }
     }
   },
@@ -481,8 +481,7 @@
       "SUPPORTED": 6
     },
     "UNSUPPORTED": {
-      "UNSUPPORTED": 20,
-      "SUPPORTED": 1
+      "UNSUPPORTED": 21
     },
     "VERIFIED|SUPPORTED": {
       "SUPPORTED": 1
@@ -585,7 +584,6 @@
       "[gap] p7: gold critical \"?Calibre\" not flagged critical by engine",
       "[truth] r5-eli: \"Experience with formal sign-off.\" got INFERRED, gold SUPPORTED — \"Formal Sign-off\" is plausible from Formal Verification but not stated — needs your confirmation.",
       "[truth] r5-eli: \"Used cutpoints and abstraction to converge proofs.\" got UNSUPPORTED, gold INFERRED — \"Formal Abstraction\" is not in your profile (only related background via Formal Verification).",
-      "[truth] r5-eli: \"Holds a PhD in formal methods.\" got SUPPORTED (LEAK), gold UNSUPPORTED — All terms are present in your profile.",
       "[truth] r5-eli: \"Defined the formal verification methodology for the company.\" got UNSUPPORTED, gold INFERRED — \"Architecture Ownership\" is not in your profile."
     ]
   }

@@ -52,11 +52,13 @@ Holdout is the number to quote. Small n: 6–59 items per cell, so ±10–15 poi
 - **Ontology**: `Post-Silicon Validation` split out of `Signoff` (bring-up was INFERRED from coverage closure → leak); `Mentoring` split from `Technical Leadership` ("led a team" verified "mentored"); `Automotive Ethernet` added; aliases `digital verification`, `machine learning for verification`, `LLM-based verification assistant`; over-broad aliases removed (`scripting`/`scripts` → Test Automation, `hiring` → People Management, bare `best practices` → Methodology Adoption).
 - **Truth counts**: "Taped out 5 automotive SoCs" passed because a `5` existed somewhere in the profile. Counts now need the same noun next to the number (people counts also accept "team of N"), with up to two adjectives in between.
 
+## Fixed after the report (holdout-motivated, contaminates holdout truth)
+- **Degree claims**: "Holds a PhD in formal methods" was SUPPORTED. Doctorate, master's, bachelor's and MBA claims must now match a degree in your education. Holdout truth now reads 100% blocked recall and a 0% leak rate, but those are **contaminated** numbers (see CHANGELOG). The pre-fix holdout values above remain the honest ones.
+
 ## Open failures (not fixed)
 Holdout, so fixing them now would contaminate holdout. Fix them alongside a gold v2 with fresh holdout items.
-- **Truth leak**: "Holds a PhD in formal methods" → SUPPORTED. Degrees are not in the credential check. Safety-relevant; it is the first thing to fix.
 - **Truth false-blocks**: practice wording in architecture/planning terms ("Defined the formal verification methodology", "Used cutpoints and abstraction") is blocked instead of INFERRED.
-- **Critical-gap recall 0/10**: 8 are the physical-design negative control (no PD vocabulary: P&R, STA, Innovus, PrimeTime, Calibre…). The engine also grades a mandatory *tool* gap as `medium`, never `critical`, which the guideline does not do. The verdict is still correct (DO NOT APPLY), but the gap list is wrong.
+- **Critical-gap recall 0/10**: 8 are the physical-design negative control. It only matters if you load a PD job; the verdict is already DO NOT APPLY (no PD vocabulary: P&R, STA, Innovus, PrimeTime, Calibre…). The engine also grades a mandatory *tool* gap as `medium`, never `critical`, which the guideline does not do. The verdict is still correct (DO NOT APPLY), but the gap list is wrong.
 - **Role employer 50% on holdout**: `Company (City)` keeps the city; a `Period` column header was taken as the employer; employer empty for one table layout.
 - **Ontology granularity**: `PCIe transaction layer`, `MMU` vs privileged architecture, `stakeholder communication`, `Arm` (as an ISA) are not distinct terms.
 - **Overclaims (related where gold says weak/missing)**: family edges are too generous for riscv-dv, load-store unit, vector extension, cutpoints, verification methodology.

@@ -25,6 +25,13 @@ const METRIC_RES: RegExp[] = [
   /\bteam of \d+\b/gi,
   /\b\d+(?:\.\d+)?\s?(?:k|m|million|billion)\+?\s+(?:gates?|tests?|lines|transactions)\b/gi,
 ];
+// Degree claims must match a degree level in the profile's education ("PhD" is never backed by an M.Tech).
+const DEGREE_LEVELS: [string, RegExp][] = [
+  ["doctorate", /(?<![a-z])(?:ph\.?\s?d|doctorate|doctoral|d\.?\s?phil)(?![a-z])/i],
+  ["master's degree", /(?<![a-z])(?:masters?|master's|m\.?\s?sc|m\.\s?s\.|ms(?=\s+(?:in|degree|from|\())|m\.?\s?tech|m\.\s?e\.|m\.?\s?eng)(?![a-z])/i],
+  ["MBA", /(?<![a-z])m\.?\s?b\.?\s?a(?![a-z])/i],
+  ["bachelor's degree", /(?<![a-z])(?:bachelors?|bachelor's|b\.?\s?sc|b\.\s?s\.|bs(?=\s+(?:in|degree|from|\())|b\.?\s?tech|b\.\s?e\.|be(?=\s+(?:in|degree)\b)|b\.?\s?eng)(?![a-z])/i],
+]
 const YEARS_RE = /\b(\d{1,2})\+?\s+years?\b/gi;
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9%+.\s-]/g, " ").replace(/\s+/g, " ").trim();
@@ -84,6 +91,10 @@ export function checkClaim(text: string, ctx: TruthContext): ClaimCheck {
   for (const m of body.matchAll(ORG_RE)) {
     const name = m[1];
     if (!normContains(idx.allText, name) && !(ctx.allowedNames ?? []).some((a) => norm(a).includes(norm(name)))) { unknownEntities.push(name); unsupported = true; reasons.push(`Organization "${name}" is not in your profile.`); }
+  }
+  const eduText = idx.profile.education.map((e) => `${e.degree} ${e.specialization}`).join("\n");
+  for (const [level, re] of DEGREE_LEVELS) {
+    if (re.test(body) && !re.test(eduText)) { unknownEntities.push(level); unsupported = true; reasons.push(`A ${level} is not in your education.`); }
   }
   const cred = body.match(CREDENTIAL);
   if (cred && !new RegExp(`\\b${cred[0]}`, "i").test(idx.allText)) { unknownEntities.push(cred[0]); unsupported = true; reasons.push(`"${cred[0]}" is not supported by your profile.`); }
