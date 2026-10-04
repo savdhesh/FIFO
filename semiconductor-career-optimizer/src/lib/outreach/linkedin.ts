@@ -41,7 +41,7 @@ export function planLinkedIn(profile: Profile, jd: ParsedJD, match: MatchResult,
   const allowed = [jd.company, jd.roleTitle, settings.targetRole].filter(Boolean);
 
   // Recruiter-search keyword coverage: fixed DV vocabulary + the JD's own terms.
-  const kw = [...new Set([...CORE, ...jd.requirements.filter((r) => r.importance !== "administrative" && r.terms[0] && ["language", "methodology", "protocol", "processor", "domain", "simulator", "formal-tool", "assertion", "coverage"].includes(r.type)).map((r) => r.terms[0])])];
+  const kw = [...new Set([...CORE, ...jd.requirements.filter((r) => r.importance !== "administrative" && r.terms[0] && ["language", "methodology", "protocol", "processor", "domain", "simulator", "formal-tool", "assertion", "coverage"].includes(r.type)).flatMap((r) => r.terms)])];
   const keywordCoverage = kw.map((k) => ({ keyword: show(k), ...cover(f, k) }));
   const titles = profile.roles.map((r) => r.title).join(" | ");
   const titleKeywords = TITLE_KW.map(([k, re]) => ({ keyword: k, held: re.test(titles), note: re.test(titles) ? "A title you have held" : "Not a title you have held. Do not add it to your headline or roles; reach it through scope and keywords." }));
@@ -84,7 +84,7 @@ export function planLinkedIn(profile: Profile, jd: ParsedJD, match: MatchResult,
     `${f.title}${f.years ? ` with ${f.years}+ years` : ""} in ${f.domain}${top.length ? `, working across ${list(top)}` : ""}.`,
     lead.length ? `What I work on:\n${lead.join("\n")}` : "",
     toolList.length || protoList.length ? `Toolbox: ${[toolList.length ? `${list(toolList)}` : "", protoList.length ? `interfaces including ${list(protoList)}` : ""].filter(Boolean).join("; ")}.` : "",
-    `Open to ${settings.targetRole || jd.roleTitle || "verification"} roles in ${settings.country}.`,
+    `Open to ${settings.targetRole || jd.roleTitle || "verification"} roles${profile.identity.location ? `; based in ${profile.identity.location}` : ""}.`,
   ].filter(Boolean);
   const removed: ClaimCheck[] = [];
   // Bullet block is trimmed profile text (kept line by line); prose paragraphs are sanitized sentence by sentence.
@@ -101,7 +101,8 @@ export function planLinkedIn(profile: Profile, jd: ParsedJD, match: MatchResult,
   const experience = profile.roles.slice(0, 4).map((r) => {
     const bs = roleBullets(r);
     const ranked = bs.map((b) => ({ b, s: rel(b) })).sort((x, y) => y.s - x.s);
-    return { roleLabel: [r.title, r.employer].filter(Boolean).join(" @ "), lead: ranked.slice(0, 3).map((x) => x.b), weak: bs.filter((b) => ["Weak", "Generic"].includes(classifyBullet(b).cls)) };
+    const weak = bs.filter((b) => ["Weak", "Generic"].includes(classifyBullet(b).cls));
+    return { roleLabel: [r.title, r.employer].filter(Boolean).join(" @ "), lead: ranked.filter((x) => !weak.includes(x.b)).slice(0, 3).map((x) => x.b), weak };
   });
 
   const featured: LinkedInPlan["featured"] = [

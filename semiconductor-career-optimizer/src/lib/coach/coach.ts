@@ -69,7 +69,10 @@ export function coachAnswer(q: PlannedQ, answer: string, profile: Profile, allow
   const NEGATED = /\b(?:have not|haven['’]t|did not|didn['’]t|never|no direct|not (?:directly )?(?:used|worked)|don['’]t have)\b/i;
   const checks = text ? auditProse(text, { index: idx, allowedNames }) : [];
   // Saying "I have not used X" is honest, not a claim about X.
-  const flags: CoachResult["flags"] = checks.filter((c) => c.status === "UNSUPPORTED" && !NEGATED.test(c.text)).map((c) => ({
+  // Explaining the question's own subject ("illegal accesses from lower privilege modes must trap") is knowledge, not a claim about your past.
+  const qTerms = new Set(ontology.findTerms([q.q, q.topic, ...q.points].join("\n")).map((h) => h.canonical));
+  const onTopicOnly = (c: (typeof checks)[number]) => !c.unknownMetrics.length && !c.unknownEntities.length && c.unknownTerms.length > 0 && c.unknownTerms.every((t) => qTerms.has(t));
+  const flags: CoachResult["flags"] = checks.filter((c) => c.status === "UNSUPPORTED" && !NEGATED.test(c.text) && !onTopicOnly(c)).map((c) => ({
     text: c.text, reasons: c.reasons,
     severity: c.unknownMetrics.length || c.unknownEntities.length || c.unknownTerms.some((t) => HARD.has(ontology.get(t)?.type ?? "")) ? "claim" as const : "detail" as const,
   }));
@@ -83,8 +86,10 @@ export function coachAnswer(q: PlannedQ, answer: string, profile: Profile, allow
     else strengths.push("You acknowledged the gap honestly before bridging.");
     if (q.stance === "gap" && claimsTopic && !ACKNOWLEDGE.test(text)) honesty = 0;
   }
-  for (const f of soft) improvements.push(`“${f.text.slice(0, 80)}…” adds detail your profile does not mention (${f.reasons[0]}). Fine if it is true; add it to your profile so your resume matches what you say.`);
-  for (const f of hard) improvements.unshift(`“${f.text.slice(0, 90)}” claims something your profile does not show (${f.reasons[0]}). Remove it, or add it to your profile only if it is true.`);
+  const quote = (t: string, n: number) => (t.length > n ? `${t.slice(0, n).trimEnd()}…` : t);
+  const why = (r: string[]) => r.map((x) => x.replace(/\.$/, "")).join("; ");
+  for (const f of soft) improvements.push(`“${quote(f.text, 80)}” adds detail your profile does not mention (${why(f.reasons)}). Fine if it is true; add it to your profile so your resume matches what you say.`);
+  for (const f of hard) improvements.unshift(`“${quote(f.text, 90)}” claims something your profile does not show (${why(f.reasons)}). Remove it, or add it to your profile only if it is true.`);
 
   // evidence use
   const usedEvidence = q.evidence.some((e) => jaccard(sig(e.text).join(" "), sig(text).join(" ")) > 0.08 || sig(e.text).filter((w) => aTokens.has(w)).length >= 4);

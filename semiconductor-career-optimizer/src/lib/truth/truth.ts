@@ -20,6 +20,7 @@ const COUNT_NOUN = "engineers?|members|people|developers|blocks?|ips?|projects?|
 const COUNT_RE = new RegExp(`\\b(?:team of\\s+)?\\d+\\+?\\s+(?:(?!(?:years?|yrs?|months?|in|of|at|on|with|for|and|or|to|across)\\b)[a-z][\\w-]*\\s+){0,2}?(?:${COUNT_NOUN})\\b`, "gi");
 const METRIC_RES: RegExp[] = [
   /\b\d+(?:\.\d+)?\s?%/g,
+  /[$€£₹]\s?\d+(?:[.,]\d+)?\s?(?:k|m|mn|million|b|bn|billion|cr|crore|lakh)?\b/gi, // money: "$2M", "₹40 lakh"
   /\b\d+(?:\.\d+)?\s?x\b/gi,
   COUNT_RE,
   /\bteam of \d+\b/gi,

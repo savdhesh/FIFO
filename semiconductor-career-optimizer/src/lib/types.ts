@@ -93,6 +93,7 @@ export const ParsedJDSchema = z.object({
   location: z.string().default(""),
   seniority: z.enum(["Engineer", "Senior", "Staff", "Principal", "Architect", "Lead", "Manager", "Unspecified"]).default("Unspecified"),
   yearsRequired: z.number().nullable().default(null),
+  yearsMax: z.number().nullable().default(null), // upper bound of a "2-4 years" range
   education: z.string().default(""),
   workAuthorization: z.string().default(""),
   requirements: z.array(RequirementSchema).default([]),

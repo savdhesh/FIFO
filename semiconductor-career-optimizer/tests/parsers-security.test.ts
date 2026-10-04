@@ -33,7 +33,7 @@ describe("JD parser", () => {
   it("classifies importance rather than weighting all sentences equally", () => {
     expect(imp("SystemVerilog")).toBe("mandatory");
     expect(imp("JasperGold")).toBe("preferred");
-    expect(imp("CXL")).toBe("preferred");
+    expect(imp("PCIe or CXL")).toBe("preferred"); // "PCIe or CXL" is one requirement either term satisfies
     expect(jd.requirements.some((r) => r.importance === "administrative")).toBe(true);
     expect(jd.workAuthorization).toMatch(/eligible to work/i);
   });

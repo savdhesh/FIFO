@@ -25,6 +25,33 @@ function ctxOf(line: string): Ctx | null {
   return null;
 }
 
+/**
+ * "Xcelium or VCS", "APB, AHB or AXI", "Python/Perl": same-type terms joined by or-separators form one requirement any member satisfies.
+ * Returns hit index -> distinct canonical members of its group.
+ */
+function alternatives(text: string, hits: { canonical: string; surface: string; index: number }[]): Map<number, string[]> {
+  const out = new Map<number, string[]>();
+  let chain: number[] = [], hasOr = false;
+  const flush = () => {
+    const members = [...new Set(chain.map((k) => hits[k].canonical))];
+    if (hasOr && members.length > 1) for (const k of chain) out.set(k, members);
+    chain = []; hasOr = false;
+  };
+  for (let i = 0; i < hits.length; i++) {
+    if (chain.length) {
+      const prev = hits[i - 1];
+      const gap = text.slice(prev.index + prev.surface.length, hits[i].index);
+      const sameType = ontology.get(prev.canonical)?.type === ontology.get(hits[i].canonical)?.type;
+      const orSep = /^\s*(?:,\s*)?(?:or|and\/or|\/)\s*$/i.test(gap);
+      if (sameType && (orSep || /^\s*,\s*$/.test(gap))) { chain.push(i); hasOr ||= orSep; continue; }
+      flush();
+    }
+    chain = [i];
+  }
+  flush();
+  return out;
+}
+
 const RANK: Record<ReqImportance, number> = { mandatory: 4, implied: 3, preferred: 2, administrative: 1, boilerplate: 0 };
 
 function inferType(term: string): ReqType { return ontology.get(term)?.type ?? "other"; }
@@ -52,14 +79,20 @@ export function parseJobDescriptionHeuristic(raw: string, hints: { company?: str
   roleTitle = roleTitle.replace(/\s*\((?:[mfwdx]\s*\/\s*){1,3}[mfwdx]\)|\s*\(all genders\)/gi, "").trim(); // German "(m/f/d)" markers
   let company = hints.company || labelled(/(?:company|employer|organi[sz]ation)\s*[:\-–]\s*([^\n]{2,60})/i);
   if (!company) company = text.match(/^\s*about\s+(?!us\b|the\b)([A-Z][A-Za-z0-9&.\-]+(?:\s+[A-Z][A-Za-z0-9&.\-]+){0,3})\s*$/m)?.[1] ?? "";
+  let headerLocation = "";
   if (!company && first[1] && !/^[A-Z][a-z]+(?: [A-Z][a-z]+)?,\s*[A-Z]{2}\b|^(?:remote|hybrid|on-?site)\b/i.test(first[1])) {
-    // Line 2 is usually "Company — City" / "Company | City" / "Company, City" / "Company (Remote)": keep the head.
-    const c = first[1].split(/\s+[—–|-]\s+|\s*\(|,\s+/)[0].trim();
-    if (c.length > 1 && c.length < 50 && !/[:;]|\.\s/.test(c) && !TITLE_WORDS.test(c) && /^[A-Z]/.test(c)) company = c;
+    // Line 2 is usually "Company — City" / "Company | City" / "Company · City" / "Company, City" / "Company (Remote)": head = company, tail = location.
+    const c = first[1].split(/\s+[—–|·-]\s+|\s*\(|,\s+/)[0].trim();
+    if (c.length > 1 && c.length < 50 && !/[:;]|\.\s/.test(c) && !TITLE_WORDS.test(c) && /^[A-Z]/.test(c)) {
+      company = c;
+      headerLocation = first[1].slice(first[1].indexOf(c) + c.length).replace(/^[\s,—–|·()-]+|[\s()]+$/g, "").trim();
+      if (headerLocation.length > 60 || /[.:;]/.test(headerLocation)) headerLocation = "";
+      if (/\([^)]*$/.test(headerLocation)) headerLocation += ")";
+    }
   }
   if (!company) company = text.match(/\b(?:join|about|at)\s+([A-Z][A-Za-z0-9&.\-]+(?:\s+[A-Z][A-Za-z0-9&.\-]+){0,3})(?=[\s,.:;!]|$)/)?.[1] ?? "";
   if (/^(?:the|our|us|this|a|an|you)$/i.test(company)) company = "";
-  const location = labelled(/location\s*[:\-–]\s*([^\n]{2,80})/i);
+  const location = labelled(/location\s*[:\-–]\s*([^\n]{2,80})/i) || headerLocation;
 
   // Requirement collection
   let ctx: Ctx = "none";
@@ -78,7 +111,7 @@ export function parseJobDescriptionHeuristic(raw: string, hints: { company?: str
   const extra: Requirement[] = [];
   const freq: Record<string, number> = {};
   const leadership: string[] = [], architecture: string[] = [], domains = new Set<string>();
-  let yearsRequired: number | null = null, education = "", workAuthorization = "";
+  let yearsRequired: number | null = null, yearsMax: number | null = null, education = "", workAuthorization = "";
   let n = 0;
   const titleTerms = new Set(ontology.findTerms(roleTitle).map((h) => h.canonical));
 
@@ -97,12 +130,17 @@ export function parseJobDescriptionHeuristic(raw: string, hints: { company?: str
       continue;
     }
 
-    const yrs = s.text.match(/(\d{1,2})\s*\+?\s*(?:-\s*\d{1,2}\s*)?(?:\+\s*)?(?:years?|yrs?)/i);
+    const yrs = s.text.match(/(\d{1,2})\s*\+?\s*(?:(?:-|–|to)\s*(\d{1,2})\s*)?(?:\+\s*)?(?:years?|yrs?)/i);
     if (yrs && /experience|years/i.test(s.text)) {
-      const y = +yrs[1];
+      const y = +yrs[1], hi = yrs[2] ? +yrs[2] : null;
       if (y > 0 && y < 40) {
-        if (imp !== "preferred") yearsRequired = yearsRequired === null ? y : Math.max(yearsRequired, y);
-        extra.push({ id: `r${++n}`, text: `${y}+ years of experience`, context: s.text, importance: imp === "implied" ? "mandatory" : imp, type: "experience", terms: [], weight: 2 });
+        // "12+ years of CPU verification": the years are owed in that domain, not career-wide. Look just after the number.
+        const tail = s.text.slice(yrs.index! + yrs[0].length, yrs.index! + yrs[0].length + 60).replace(/^\s*(?:of|in)\s+(?:hands-on\s+)?(?:experience\s+(?:in|with)\s+)?/i, "");
+        const near = /^\s*(?:of|in|with)\b/i.test(s.text.slice(yrs.index! + yrs[0].length)) ? ontology.findTerms(tail).find((h) => h.index < 12) : undefined;
+        const domain = near && !["Design Verification"].includes(near.canonical) ? near.canonical : null;
+        if (imp !== "preferred") { yearsRequired = yearsRequired === null ? y : Math.max(yearsRequired, y); if (hi && hi > y) yearsMax = hi; }
+        const range = hi && hi > y ? `${y}–${hi} years` : `${y}+ years`;
+        extra.push({ id: `r${++n}`, text: domain ? `${range} of ${domain} experience` : `${range} of experience`, context: s.text, importance: imp === "implied" ? "mandatory" : imp, type: "experience", terms: domain ? [domain] : [], weight: 2 });
       }
     }
     const edu = s.text.match(/\b(bachelor\w*|master\w*|ph\.?d\.?|b\.?\s?tech|m\.?\s?tech|bs|ms|degree)\b[^.;]*/i);
@@ -111,15 +149,20 @@ export function parseJobDescriptionHeuristic(raw: string, hints: { company?: str
       extra.push({ id: `r${++n}`, text: s.text.slice(0, 160), context: s.text, importance: imp === "implied" ? "mandatory" : imp, type: "education", terms: [], weight: 1 });
     }
 
-    for (const h of ontology.findTerms(s.text)) {
+    const hits = ontology.findTerms(s.text);
+    const alt = alternatives(s.text, hits);
+    for (const [i, h] of hits.entries()) {
       const entry = ontology.get(h.canonical)!;
       freq[h.canonical] = (freq[h.canonical] ?? 0) + 1;
       let termImp = imp;
       if (titleTerms.has(h.canonical)) termImp = "mandatory";
-      const key = h.canonical;
+      const group = alt.get(i);
+      if (group && group[0] !== h.canonical) continue; // the group is recorded once, under its first member
+      const terms = group ?? [h.canonical];
+      const key = terms.join(" or ");
       const prev = reqMap.get(key);
       if (!prev || RANK[termImp] > RANK[prev.importance]) {
-        reqMap.set(key, { id: prev?.id ?? `r${++n}`, text: key, context: s.text, importance: termImp, type: inferType(key), terms: [key], weight: 1 });
+        reqMap.set(key, { id: prev?.id ?? `r${++n}`, text: key, context: s.text, importance: termImp, type: inferType(terms[0]), terms, weight: 1 });
       }
       if (entry.type === "leadership" || entry.type === "management") leadership.push(s.text);
       if (entry.type === "architecture" || entry.type === "planning") architecture.push(s.text);
@@ -136,7 +179,7 @@ export function parseJobDescriptionHeuristic(raw: string, hints: { company?: str
   return ParsedJDSchema.parse({
     roleTitle, company, location,
     seniority: detectSeniority(roleTitle || text.slice(0, 200)),
-    yearsRequired, education, workAuthorization,
+    yearsRequired, yearsMax, education, workAuthorization,
     requirements, keywordFrequency: freq,
     leadershipExpectations: [...new Set(leadership)].slice(0, 6),
     architectureExpectations: [...new Set(architecture)].slice(0, 6),

@@ -64,5 +64,8 @@ Holdout, so fixing them now would contaminate holdout. Fix them alongside a gold
 - **Overclaims (related where gold says weak/missing)**: family edges are too generous for riscv-dv, load-store unit, vector extension, cutpoints, verification methodology.
 - **JD titles**: specialization suffixes (`– PCIe/CXL`, `(RISC-V)`, `, AI-Driven Verification`) are kept. Gold strips them; this is arguably a gold-side strictness question, not a bug.
 
+## Status after audit round 3
+Holdout is now contaminated for truth, JD and match metrics (see CHANGELOG). Current run, for regression tracking only: holdout JD company 100%, requirement recall 90%, match type 90%, overclaim 5.3%, verdicts 4/4, truth blocked recall 100%, leak 0%. Role employer is still 50% on holdout and is the largest remaining parser weakness. Set `EVAL_OUT=dir` to write the report elsewhere.
+
 ## Adding items
 Write labels from GUIDELINES.md **before** running the engine, assign a split, commit the gold first, then run `npm run eval`.

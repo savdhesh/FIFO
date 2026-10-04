@@ -1,3 +1,4 @@
+import { totalYears } from "../parsing/dates";
 import type {
   GapClass, GapKind, MatchResult, MatchType, ParsedJD, Profile, Requirement, RequirementMatch, ScoreDetail, Settings,
 } from "../types";
@@ -83,14 +84,21 @@ const presentationGap = (k: GapKind) => k === "presentation-gap";
 
 function matchYears(req: Requirement, idx: ProfileIndex): RequirementMatch {
   const need = parseInt(req.text, 10) || 0;
-  const have = idx.years;
+  // Domain-qualified years ("12+ years of CPU Verification"): count only roles that evidence the domain or a child of it.
+  const domain = req.terms[0];
+  let have = idx.years;
+  if (domain) {
+    const related = new Set([domain, ...ontology.entries.filter((e) => e.parent && e.parent.toLowerCase() === domain.toLowerCase()).map((e) => e.canonical)]);
+    const roleIds = new Set([...related].flatMap((t) => (idx.evidence.get(t) ?? []).map((e) => e.roleId)));
+    have = totalYears(idx.profile.roles.filter((r) => roleIds.has(r.id)).map((r) => ({ start: r.startDate, end: r.endDate })));
+  }
   const type: MatchType = have >= need ? "exact" : have >= need * 0.8 ? "related" : "missing";
   return {
     requirementId: req.id, requirement: req.text, importance: req.importance, type: "experience", matchType: type,
     confidence: "High", evidence: [], matchedTerms: [],
     action: type === "exact" ? "Keep" : "Do not overstate years",
     gap: type === "exact" ? "none" : type === "related" ? "minor" : "medium", gapKind: type === "exact" ? "none" : "real-skill-gap",
-    explanation: `Computed ${have} years from role dates; JD asks ${need}+.`, score: type === "exact" ? 1 : type === "related" ? 0.6 : 0.2,
+    explanation: `Computed ${have} years${domain ? ` in roles showing ${domain}` : ""} from role dates; JD asks ${req.text.replace(/ of .*$/, "")}${domain ? ` of ${domain}` : ""}.`, score: type === "exact" ? 1 : type === "related" ? 0.6 : 0.2,
   };
 }
 
@@ -129,6 +137,12 @@ export function analyzeMatch(profile: Profile, jd: ParsedJD, settings?: Partial<
     if (r.importance === "boilerplate" || r.importance === "administrative") continue;
     if (r.type === "experience") rows.push(matchYears(r, idx));
     else if (r.type === "education") rows.push(matchEducation(r, idx));
+    else if (r.terms.length > 1) {
+      // Alternatives ("Xcelium or VCS"): the best-matching member satisfies the requirement; the others are kept for transparency.
+      const opts = r.terms.map((t) => matchTerm(t, idx, r, jd.keywordFrequency[t] ?? 1)).sort((a, b) => b.score - a.score);
+      const best = opts[0];
+      rows.push({ ...best, matchedTerms: opts.flatMap((o) => o.matchedTerms), explanation: `${best.explanation} The JD accepts any of: ${r.terms.join(", ")}.` });
+    }
     else if (r.terms[0]) rows.push(matchTerm(r.terms[0], idx, r, jd.keywordFrequency[r.terms[0]] ?? 1));
   }
 
@@ -208,6 +222,11 @@ export function analyzeMatch(profile: Profile, jd: ParsedJD, settings?: Partial<
   else if (overall >= 35) verdict = "LOW PRIORITY";
   else verdict = "DO NOT APPLY";
   if (diff <= -2 && verdict !== "DO NOT APPLY") verdict = "LOW PRIORITY";
+  // Heavily overqualified for a ranged role ("2-4 years" vs 13): a fit on skills, but rarely a strong apply.
+  if (jd.yearsMax && idx.years > jd.yearsMax + 4) {
+    reasons.push(`Overqualified on years: the role targets ${jd.yearsRequired ?? 0}–${jd.yearsMax} years; your dates add up to ${idx.years}. Expect questions about level and pay.`);
+    if (verdict === "STRONG APPLY") verdict = "APPLY";
+  }
 
   // Keyword analysis with explainability
   const keywordAnalysis = Object.entries(jd.keywordFrequency).sort((a, b) => b[1] - a[1]).slice(0, 25).map(([term, jdMentions]) => {
@@ -226,6 +245,7 @@ export function analyzeMatch(profile: Profile, jd: ParsedJD, settings?: Partial<
     recommendation: m.gapKind === "presentation-gap"
       ? `Presentation gap. Add "${m.requirement}" to the relevant role only if you confirm ownership.`
       : m.matchType === "related" ? `Development area. Related background (${m.matchedTerms[0]?.via}) exists, but ${m.requirement} is not established — never claim it.`
+      : m.matchType === "exact" ? `Listed in your skills, but no role bullet shows it. Add a bullet where you used ${m.requirement}, or expect to be asked about it.`
       : `Real skill gap. ${m.requirement} is not evidenced; do not claim it.`,
   }));
   const strengths = rows.filter((m) => m.score >= 0.9 && m.importance === "mandatory").map((m) => m.requirement).slice(0, 10);

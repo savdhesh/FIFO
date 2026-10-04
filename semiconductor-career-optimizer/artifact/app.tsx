@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Badge, Button, Card, Input, Label, Select, Textarea, cx, matchTone, statusTone } from "./ui";
+import { Badge, Button, Card, Input, Label, Select, Textarea, band, cx, matchTone, statusTone } from "./ui";
 import { ProfileSchema, SKILL_CATEGORIES, SettingsSchema, type Profile, type Role } from "../src/lib/types";
 import { COUNTRY_NAMES } from "../src/lib/countries";
 import { DEMO_JD_TEXT, DEMO_RESUME_TEXT } from "../src/lib/demo";
@@ -87,17 +87,17 @@ function App({ initial }: { initial: Store }) {
 
   const nav: [typeof view, string][] = [["profile", "Profile"], ["analyze", "Analyze a job"], ["apps", `Applications (${store.apps.length})`], ["versions", "Versions"], ["analytics", "Analytics"], ["deck", "Presentation"], ["settings", "Settings"]];
   return (
-    <div className="mx-auto max-w-6xl px-4 pb-16">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line py-4">
-        <div><div className="font-mono text-[11px] uppercase tracking-[0.18em] text-gray-500">DV · SoC · RISC-V · Formal · FuSa</div><h1 className="text-xl font-semibold">Semiconductor Career Optimizer</h1></div>
+    <div className="sco-main mx-auto max-w-6xl px-4 pb-16" data-view={view}>
+      <header className="sco-band flex flex-wrap items-center justify-between gap-3">
+        <div><div className="sco-eyebrow">DV · SoC · RISC-V · Formal · FuSa</div><h1>Semiconductor Career Optimizer</h1></div>
         <div className="flex flex-wrap items-center gap-3">{adapter.user && <span className="text-xs text-gray-500">{adapter.user.email} {adapter.logout && <button className="ml-1 underline" onClick={() => adapter.logout!()}>Sign out</button>}</span>}
         <label className={cx("flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm", !sample && "opacity-60")} title={sample ? (adapter.mode === "server" ? "Sends resume and job text to the configured AI vendor from this server." : "Use Claude for parsing, rewrites and the cover letter. Runs on your own Claude usage.") : "No AI provider is available here; the offline engine is used."}>
           <input type="checkbox" id="use-claude" disabled={!sample} checked={useClaude} onChange={(e) => setUseClaude(e.target.checked)} />
           {sample ? (adapter.mode === "server" ? `Use ${adapter.aiProvider ?? "AI"} for language tasks` : "Use Claude for language tasks") : "Offline engine (AI unavailable)"}
         </label></div>
       </header>
-      <nav className="flex flex-wrap gap-1 py-3" aria-label="Sections">{nav.map(([k, l]) => <button key={k} onClick={() => { setView(k); setOpenId(null); }} className={cx("rounded-md px-3 py-1.5 text-sm", view === k ? "bg-ink text-white" : "hover:bg-gray-100")}>{l}</button>)}</nav>
-      {busy && <div role="status" className="mb-3 flex items-center justify-between rounded-md border border-line bg-gray-50 p-3 text-sm"><span>{busy}</span>{abort.current && <Button size="sm" variant="outline" onClick={() => abort.current?.abort()}>Stop</Button>}</div>}
+      <nav className="sco-nav flex flex-wrap gap-2 py-4" aria-label="Sections">{nav.map(([k, l]) => <button key={k} data-view={k} aria-current={view === k ? "page" : undefined} onClick={() => { setView(k); setOpenId(null); }}>{l}</button>)}</nav>
+      {busy && <div role="status" className="sco-busy mb-3 flex items-center justify-between rounded-md border border-line bg-gray-50 p-3 text-sm"><span>{busy}</span>{abort.current && <Button size="sm" variant="outline" onClick={() => abort.current?.abort()}>Stop</Button>}</div>}
       {toast && <div role={toast.tone === "err" ? "alert" : "status"} className={cx("mb-3 rounded-md border p-3 text-sm", toast.tone === "err" ? "border-red-300 bg-red-50 text-red-800" : "border-green-300 bg-green-50 text-green-800")}>{toast.text}</div>}
 
       {view === "profile" && <ProfileView profile={store.profile} setProfile={setProfile} resumes={store.resumes} setResumes={(f: (r: Resume[]) => Resume[]) => setStore((s) => ({ ...s, resumes: f(s.resumes) }))} provider={provider} run={run} say={say} claudeOn={!!transport} goAnalyze={() => setView("analyze")} />}
@@ -299,7 +299,7 @@ function AppsList({ apps: all, open }: { apps: AppRecord[]; open: (id: string) =
         <Card><div className="text-xs uppercase text-gray-500">Frequent gaps</div><div className="text-sm">{top(gaps).map(([k]) => k).join(", ") || "–"}</div></Card>
       </div>
       <div className="grid gap-3 md:grid-cols-3"><Card><div className="text-xs uppercase text-gray-500">Interviews</div><div className="font-mono text-2xl">{interviews}</div></Card><Card><div className="text-xs uppercase text-gray-500">Offers</div><div className="font-mono text-2xl">{counts.get("OFFER") ?? 0}</div></Card><Card><div className="text-xs uppercase text-gray-500">Response rate</div><div className="font-mono text-2xl">{progressed.length ? `${Math.round((responded / progressed.length) * 100)}%` : "–"}</div></Card></div>
-      <div className="flex flex-wrap gap-1" role="group" aria-label="Pipeline">{[["ALL", all.length] as [string, number], ...STATUSES.filter((st) => counts.has(st)).map((st) => [st, counts.get(st)!] as [string, number])].map(([st, n]) => <button key={st} onClick={() => setFilter(st)} className={cx("rounded-md border border-line px-2 py-1 text-xs", filter === st && "bg-ink text-white")}>{st === "ALL" ? "All" : st.replace(/_/g, " ")} <span className="font-mono">{n}</span></button>)}</div>
+      <div className="flex flex-wrap gap-1" role="group" aria-label="Pipeline">{[["ALL", all.length] as [string, number], ...STATUSES.filter((st) => counts.has(st)).map((st) => [st, counts.get(st)!] as [string, number])].map(([st, n]) => <button key={st} onClick={() => setFilter(st)} className={cx("rounded-md border border-line px-2 py-1 text-xs", filter === st && "bg-view text-on-view")}>{st === "ALL" ? "All" : st.replace(/_/g, " ")} <span className="font-mono">{n}</span></button>)}</div>
       <Card className="overflow-x-auto p-0"><table className="w-full text-sm"><thead className="border-b border-line text-left text-xs uppercase text-gray-500"><tr><th className="p-3">Role</th><th>Company</th><th>Match</th><th>Verdict</th><th>Status</th><th>Created</th></tr></thead>
         <tbody>{apps.map((a) => <tr key={a.id} className="border-b border-line last:border-0 hover:bg-gray-50"><td className="p-3"><button className="text-left underline" onClick={() => open(a.id)}>{a.roleTitle || "Untitled"}</button></td><td>{a.company}</td><td className="font-mono">{a.match.overall}</td><td><Badge tone={a.match.recommendation.verdict.includes("GAPS") ? "amber" : a.match.recommendation.verdict.match(/LOW|DO NOT/) ? "red" : "green"}>{a.match.recommendation.verdict}</Badge></td><td>{a.status.replace(/_/g, " ")}</td><td>{new Date(a.createdAt).toLocaleDateString()}</td></tr>)}</tbody></table></Card>
     </div>
@@ -316,7 +316,7 @@ function AppDetail({ app: a, profile, update, back, remove, provider, run, say, 
         <div><button className="text-xs underline" onClick={back}>← All applications</button><h2 className="text-xl font-semibold">{a.roleTitle || "Untitled role"}</h2><p className="text-sm text-gray-600">{a.company || "Unknown company"} · {a.settings.country} · {a.settings.seniority} · {a.settings.length === "cv" ? "detailed CV" : `${a.settings.length} page(s)`}</p></div>
         <Badge tone={a.match.overall >= 75 ? "green" : a.match.overall >= 55 ? "amber" : "red"} className="text-base">{a.match.recommendation.verdict} · {a.match.overall}</Badge>
       </div>
-      <div role="tablist" className="flex flex-wrap border-b border-line">{TABS.map((t) => <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cx("border-b-2 px-3 py-2 text-sm", tab === t ? "border-ink font-medium" : "border-transparent text-gray-600")}>{t}</button>)}</div>
+      <div role="tablist" className="flex flex-wrap border-b border-line">{TABS.map((t) => <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cx("border-b-2 px-3 py-2 text-sm", tab === t ? "border-view font-semibold text-view" : "border-transparent text-gray-600 hover:text-view")}>{t}</button>)}</div>
       {tab === "Overview" && <Overview a={a} profile={profile} />}
       {tab === "Strategy" && <StrategyTab a={a} profile={profile} />}
       {tab === "Requirements" && <Requirements a={a} />}
@@ -340,7 +340,7 @@ function Overview({ a, profile }: { a: AppRecord; profile: Profile }) {
     <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2"><h3 className="mb-1 text-sm font-semibold">Scores <span className="font-normal text-gray-500">· select one to see why</span></h3>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">{a.match.scores.map((s) => <button key={s.key} onClick={() => setOpen(s.key)} className={cx("rounded-md border p-3 text-left", open === s.key ? "border-ink" : "border-line")}><div className="text-xs text-gray-500">{s.label}</div><div className="font-mono text-2xl font-semibold">{s.value}</div><div className="mt-1 h-1.5 rounded bg-gray-100"><div className="h-1.5 rounded bg-ink" style={{ width: `${s.value}%` }} /></div></button>)}</div>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">{a.match.scores.map((s) => <button key={s.key} onClick={() => setOpen(s.key)} className={cx("rounded-md border p-3 text-left", open === s.key ? "border-view bg-view-soft" : "border-line hover:border-view")}><div className="text-xs text-gray-500">{s.label}</div><div className="font-mono text-2xl font-semibold">{s.value}</div><div className="mt-1 h-1.5 rounded bg-gray-100"><div className="sco-meter h-1.5 rounded" data-band={band(s.value)} style={{ width: `${s.value}%` }} /></div></button>)}</div>
           {sel && <div className="mt-3 rounded-md bg-gray-50 p-3 text-sm"><b>{sel.label}: {sel.value}</b><ul className="mt-1 list-disc pl-5 text-gray-700">{sel.why.map((w, i) => <li key={i}>{w}</li>)}</ul></div>}
         </Card>
         <Card><h3 className="mb-2 text-sm font-semibold">Recommendation</h3><div className="mb-2 text-lg font-semibold">{a.match.recommendation.verdict}</div><ul className="list-disc space-y-1 pl-5 text-sm">{a.match.recommendation.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul><h4 className="mb-1 mt-4 text-xs font-semibold uppercase text-gray-500">Seniority</h4><p className="text-sm">Resume communicates <b>{a.match.seniority.detected}</b>; JD seniority: {a.jd.seniority}.</p></Card>
@@ -677,10 +677,10 @@ function InterviewTab({ a, profile, update, provider, run }: any) {
       </Card>
       {plan && <>
         <Card><h3 className="mb-2 text-sm font-semibold">Topic likelihood <span className="font-normal text-gray-500">· weighted to {plan.targetLevelName} level</span></h3>
-          <div className="grid gap-x-8 gap-y-1 md:grid-cols-2">{plan.topics.map((t: any) => <div key={t.topic} className="text-sm" title={t.reasons.join("; ")}><div className="flex items-center justify-between gap-2"><span>{t.display} {t.stance !== "strength" && <Badge tone={t.stance === "gap" ? "red" : "amber"}>{t.stance}</Badge>}</span><Badge tone={probTone(t.probability)}>{t.probability}</Badge></div><div className="mt-0.5 h-1 rounded bg-gray-100"><div className="h-1 rounded bg-ink" style={{ width: `${Math.min(100, t.score * 10)}%` }} /></div></div>)}</div>
+          <div className="grid gap-x-8 gap-y-1 md:grid-cols-2">{plan.topics.map((t: any) => <div key={t.topic} className="text-sm" title={t.reasons.join("; ")}><div className="flex items-center justify-between gap-2"><span>{t.display} {t.stance !== "strength" && <Badge tone={t.stance === "gap" ? "red" : "amber"}>{t.stance}</Badge>}</span><Badge tone={probTone(t.probability)}>{t.probability}</Badge></div><div className="mt-0.5 h-1 rounded bg-gray-100"><div className="sco-meter h-1 rounded" style={{ width: `${Math.min(100, t.score * 10)}%` }} /></div></div>)}</div>
           <ul className="mt-3 list-disc pl-5 text-xs text-gray-500">{plan.notes.map((n: string, i: number) => <li key={i}>{n}</li>)}</ul></Card>
-        <div className="flex flex-wrap items-center gap-2" role="tablist">{([["bank", `Top ${plan.questions.length}`], ["resume", `From your resume (${plan.resumeDrills.length})`], ["gap", `Your gaps (${plan.gapQuestions.length})`], ["live", "Live exercises"], ["practice", "Practice with feedback"]] as const).map(([k, l]) => <button key={k} role="tab" aria-selected={src === k} onClick={() => setSrc(k)} className={cx("rounded-md border border-line px-3 py-1 text-sm", src === k && "bg-ink text-white")}>{l}</button>)}
-          {src !== "live" && src !== "practice" && <span className="ml-3 flex gap-1" role="group" aria-label="Level">{[[0, "All"], [1, "Basic"], [2, "Intermediate"], [3, "Staff"], [4, "Principal"]].map(([v, l]) => <button key={v as number} onClick={() => setLvl(v as number)} className={cx("rounded-md border border-line px-2 py-1 text-xs", lvl === v && "bg-ink text-white")}>{l}</button>)}</span>}</div>
+        <div className="flex flex-wrap items-center gap-2" role="tablist">{([["bank", `Top ${plan.questions.length}`], ["resume", `From your resume (${plan.resumeDrills.length})`], ["gap", `Your gaps (${plan.gapQuestions.length})`], ["live", "Live exercises"], ["practice", "Practice with feedback"]] as const).map(([k, l]) => <button key={k} role="tab" aria-selected={src === k} onClick={() => setSrc(k)} className={cx("rounded-md border border-line px-3 py-1 text-sm", src === k && "bg-view text-on-view")}>{l}</button>)}
+          {src !== "live" && src !== "practice" && <span className="ml-3 flex gap-1" role="group" aria-label="Level">{[[0, "All"], [1, "Basic"], [2, "Intermediate"], [3, "Staff"], [4, "Principal"]].map(([v, l]) => <button key={v as number} onClick={() => setLvl(v as number)} className={cx("rounded-md border border-line px-2 py-1 text-xs", lvl === v && "bg-view text-on-view")}>{l}</button>)}</span>}</div>
         {src === "practice" ? <PracticePanel a={a} plan={plan} profile={profile} update={update} provider={provider} run={run} /> : src === "live" ? <Card><h3 className="mb-2 text-sm font-semibold">Likely live exercises</h3>{plan.liveExercises.length ? <ul className="list-disc space-y-1 pl-5 text-sm">{plan.liveExercises.map((x: string, i: number) => <li key={i}>{x}</li>)}</ul> : <p className="text-sm text-gray-500">Nothing in this job points at a specific live exercise.</p>}</Card>
           : <div className="space-y-3">{list.map((q: any) => (
             <Card key={q.id} className={cx(done[q.id] && "opacity-70")}>
@@ -722,7 +722,7 @@ function PracticePanel({ a, plan, profile, update, provider, run }: any) {
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <Card className="space-y-2 lg:col-span-1"><h3 className="text-sm font-semibold">Pick a question</h3>
-        <div className="max-h-[28rem] space-y-1 overflow-auto" role="listbox" aria-label="Questions">{all.map((x) => { const h = practice[x.id]; return <button key={x.id} role="option" aria-selected={x.id === sel} onClick={() => setSel(x.id)} className={cx("block w-full rounded-md border border-line p-2 text-left text-sm", x.id === sel && "border-ink")}><span className="line-clamp-2">{x.q}</span><span className="mt-1 flex gap-1"><Badge tone={levelTone(x.level)}>{x.levelName}</Badge>{h ? <Badge tone={tone(h[h.length - 1].score)}>last {h[h.length - 1].score}</Badge> : <Badge>new</Badge>}</span></button>; })}</div>
+        <div className="max-h-[28rem] space-y-1 overflow-auto" role="listbox" aria-label="Questions">{all.map((x) => { const h = practice[x.id]; return <button key={x.id} role="option" aria-selected={x.id === sel} onClick={() => setSel(x.id)} className={cx("block w-full rounded-md border border-line p-2 text-left text-sm", x.id === sel && "border-view")}><span className="line-clamp-2">{x.q}</span><span className="mt-1 flex gap-1"><Badge tone={levelTone(x.level)}>{x.levelName}</Badge>{h ? <Badge tone={tone(h[h.length - 1].score)}>last {h[h.length - 1].score}</Badge> : <Badge>new</Badge>}</span></button>; })}</div>
         {weak.length > 0 && <div><Label>Weakest topics so far</Label>{weak.slice(0, 4).map((w) => <div key={w.topic} className="flex justify-between text-sm"><span>{show(w.topic)}</span><span className="font-mono text-xs text-gray-500">{w.avg} · {w.attempts}×</span></div>)}</div>}
       </Card>
       <div className="space-y-3 lg:col-span-2">
@@ -736,7 +736,7 @@ function PracticePanel({ a, plan, profile, update, provider, run }: any) {
         </Card>
         {res && <Card className="space-y-3">
           <div className="flex items-center gap-3"><div className="font-mono text-3xl font-semibold">{res.score}</div><Badge tone={tone(res.score)}>{res.band}</Badge></div>
-          <div className="space-y-1">{res.dims.map((d) => <div key={d.key} className="grid grid-cols-[14rem_1fr_auto] items-center gap-2 text-sm"><span>{d.label}</span><div className="h-2 rounded bg-gray-100"><div className="h-2 rounded bg-accent" style={{ width: `${Math.round(d.score * 100)}%` }} /></div><span className="text-xs text-gray-500">{d.note}</span></div>)}</div>
+          <div className="space-y-1">{res.dims.map((d) => <div key={d.key} className="grid grid-cols-[14rem_1fr_auto] items-center gap-2 text-sm"><span>{d.label}</span><div className="h-2 rounded bg-gray-100"><div className="sco-meter h-2 rounded" data-band={band(Math.round(d.score * 100))} style={{ width: `${Math.round(d.score * 100)}%` }} /></div><span className="text-xs text-gray-500">{d.note}</span></div>)}</div>
           {res.flags.filter((f) => f.severity === "claim").length > 0 && <div role="alert" className="rounded border border-red-300 bg-red-50 p-2 text-sm text-red-800"><b>POTENTIAL HALLUCINATION in your answer:</b> {res.flags.filter((f) => f.severity === "claim").map((f) => `“${f.text}” — ${f.reasons.join(" ")}`).join(" | ")}</div>}
           {res.strengths.length > 0 && <div><Label>What worked</Label><ul className="list-disc pl-5 text-sm">{res.strengths.map((x, i) => <li key={i}>{x}</li>)}</ul></div>}
           {res.improvements.length > 0 && <div><Label>To improve</Label><ul className="list-disc pl-5 text-sm">{res.improvements.map((x, i) => <li key={i}>{x}</li>)}</ul></div>}
@@ -751,7 +751,7 @@ function PracticePanel({ a, plan, profile, update, provider, run }: any) {
 
 function Bars({ rows, label }: { rows: { name: string; value: number; sub?: string }[]; label: string }) {
   const max = Math.max(1, ...rows.map((r) => r.value));
-  return <div role="img" aria-label={label} className="space-y-1">{rows.map((r) => <div key={r.name} className="grid grid-cols-[8rem_1fr_3.5rem] items-center gap-2 text-sm"><span className="truncate">{r.name}</span><div className="h-3 rounded bg-gray-100"><div className="h-3 rounded bg-accent" style={{ width: `${(r.value / max) * 100}%` }} /></div><span className="text-right font-mono text-xs">{r.value}{r.sub ? ` ${r.sub}` : ""}</span></div>)}</div>;
+  return <div role="img" aria-label={label} className="space-y-1">{rows.map((r) => <div key={r.name} className="grid grid-cols-[8rem_1fr_3.5rem] items-center gap-2 text-sm"><span className="truncate">{r.name}</span><div className="h-3 rounded bg-gray-100"><div className="sco-meter h-3 rounded" style={{ width: `${(r.value / max) * 100}%` }} /></div><span className="text-right font-mono text-xs">{r.value}{r.sub ? ` ${r.sub}` : ""}</span></div>)}</div>;
 }
 
 function AnalyticsView({ apps, open }: { apps: AppRecord[]; open: (id: string) => void }) {

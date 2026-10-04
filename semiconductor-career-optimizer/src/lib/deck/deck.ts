@@ -87,7 +87,7 @@ export function buildDeck(profile: Profile, opts: DeckOptions = {}): Deck {
     const years = Math.floor(idx.years);
     const sk = profile.skills;
     const s = slide("snapshot", "Career snapshot", []);
-    const stats: [string, string][] = [[years ? `${years}+` : "–", "years of experience"], [String(profile.roles.length), "roles"], [String(profile.projects.length || "–"), "listed projects"], [String(idx.terms.size), "verification terms evidenced"]];
+    const stats: [string, string][] = [[years ? `${years}+` : "–", "years of experience"], [String(profile.roles.length), "roles"], ...(profile.projects.length ? [[String(profile.projects.length), "listed projects"] as [string, string]] : []), [String(idx.terms.size), "verification terms evidenced"]];
     stats.forEach(([big, small], i) => { const x = 0.7 + i * 3.1; s.addText(big, { x, y: 1.6, w: 2.9, h: 0.9, fontFace: FONT, fontSize: 40, bold: true, color: C.accent }); s.addText(small, { x, y: 2.5, w: 2.9, h: 0.4, fontFace: FONT, fontSize: 13, color: C.sub }); });
     const cols: [string, string[]][] = [["Domains", [...sk.domains, ...sk.processor].slice(0, 8)], ["Methods", [...sk.verification, ...sk.formal, ...sk.methodologies].slice(0, 8)], ["Tools and protocols", [...sk.tools, ...sk.protocols].slice(0, 8)]];
     cols.forEach(([h, items], i) => { const x = 0.7 + i * 4.1; s.addText(h, { x, y: 3.4, w: 3.8, h: 0.4, fontFace: FONT, fontSize: 14, bold: true, color: C.ink }); bullets(s, items.length ? items : ["(none listed)"], { x, y: 3.85, w: 3.8, h: 2.9 }, 14); });
@@ -161,7 +161,7 @@ export function buildDeck(profile: Profile, opts: DeckOptions = {}): Deck {
   }
   // 8. Education
   if (inc.education && (profile.education.length || profile.certifications.length || profile.publications.length)) {
-    const lines = [...profile.education.map((e) => [e.degree, e.specialization, e.university, e.year].filter(Boolean).join(", ")), ...profile.certifications.map((c) => `Certification: ${c}`), ...profile.publications.map((c) => `Publication: ${c}`)];
+    const lines = [...profile.education.map((e) => [e.degree, e.degree.toLowerCase().includes(e.specialization.toLowerCase()) ? "" : e.specialization, e.university, e.year].filter(Boolean).join(", ")), ...profile.certifications.map((c) => `Certification: ${c}`), ...profile.publications.map((c) => `Publication: ${c}`)];
     const s = slide("education", "Education and credentials", lines); bullets(s, lines.slice(0, 8), { x: 0.7, y: 1.7, w: W - 1.4, h: 5 }, 17);
   }
   // 9. Closing

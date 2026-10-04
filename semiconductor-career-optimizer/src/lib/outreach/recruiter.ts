@@ -2,6 +2,7 @@ import type { ClaimCheck, MatchResult, ParsedJD, Profile, Settings } from "../ty
 import { sanitizeProse } from "../truth/truth";
 import { gatherFacts, list, show, type Facts } from "./shared";
 import { ontology } from "../ontology/ontology";
+import { recentTerms } from "../profile-index";
 
 export const CONNECT_LIMIT = 300;
 export interface Message { kind: string; text: string; length: number; limit?: number; removed: ClaimCheck[] }
@@ -40,13 +41,14 @@ export function planOutreach(profile: Profile, jd: ParsedJD, match: MatchResult,
   const evidence = f.idx.items.filter((i) => i.kind === "bullet").find((i) => /^(owned|led|built|developed|defined|architected)/i.test(i.text) && ontology.findTerms(i.text).some((h) => f.jdTerms.includes(h.canonical)))?.text;
   const short = evidence?.split(/,\s+(?:including|using|with)\b|\s+using\b/)[0].replace(/[.;]\s*$/, "");
   const fp = short ? `I ${short.charAt(0).toLowerCase()}${short.slice(1)}.` : "";
-  const focus = [...new Set(jd.requirements.filter((r) => r.importance === "mandatory" && ["domain", "processor", "methodology"].includes(r.type) && f.idx.terms.has(r.text)).map((r) => show(r.text)))].slice(0, 3);
+  const recent = recentTerms(profile);
+  const focus = [...new Set(jd.requirements.filter((r) => r.importance === "mandatory" && ["domain", "processor", "methodology"].includes(r.type) && recent.has(r.text)).map((r) => show(r.text)))].slice(0, 3);
 
   const drafts: [string, string, number?][] = [
     ["Connection request", connect, CONNECT_LIMIT],
     ["Message after applying", `Hi ${rn}, I applied for the ${role} role at ${co}. I have ${yrs} across ${list(caps.slice(0, 4))}. ${focus.length ? `The posting's focus on ${list(focus)} lines up with my current work. ` : ""}I'd be glad to share more detail on any of it. Thank you for your time.`],
     ["Reply to a recruiter who contacted you", `Hi ${rn}, thanks for reaching out about the ${role} role at ${co}. My background is ${list(caps.slice(0, 3))}, so the scope looks relevant. Could you share the team, location and work-model details? I'm available to talk on [day/time].`],
-    ["Hiring manager outreach", `Hi ${hm}, I applied for the ${role} role on your team at ${co}. ${fp} ${focus.length ? `The posting centres on ${list(focus)}, which is where I've been working. ` : ""}Would a short conversation be useful?`.replace(/\s+/g, " ")],
+    ["Hiring manager outreach", `Hi ${hm}, I applied for the ${role} role on your team at ${co}. ${fp} ${focus.length ? `The posting focuses on ${list(focus)}, which is where I'm working now. ` : ""}Would a short conversation be useful?`.replace(/\s+/g, " ")],
   ];
   const messages: Message[] = drafts.map(([kind, text, limit]) => {
     const r = sanitizeProse(text, ctx, false);

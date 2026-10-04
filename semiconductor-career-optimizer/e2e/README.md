@@ -6,7 +6,7 @@ Not part of `npm test` because they need a browser and, for server mode, a runni
 npm i -D playwright-core          # once; Chromium path via CHROMIUM=/path/to/chrome or /opt/pw-browsers
 npm run build                     # builds dist/artifact.html and public/workspace
 node e2e/claude-mode.mjs          # artifact with a fake Claude runtime (function-valued `sample`, `downloads`)
-node e2e/ui-audit.mjs             # every tab at 1280/400 px: overflow, unlabeled controls, blocked storage, dark mode
+SHOTS=/tmp/shots node e2e/ui-audit.mjs   # every tab at 1280/400 px: overflow, unlabeled controls, blocked storage, dark mode (SHOTS = screenshot dir)
 # server mode:
 node e2e/stub-ai.mjs &            # fake OpenAI-compatible vendor on :4010
 AI_PROVIDER=openai OPENAI_API_KEY=sk-test OPENAI_BASE_URL=http://localhost:4010 npm start &

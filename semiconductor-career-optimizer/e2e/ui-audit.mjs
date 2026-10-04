@@ -15,7 +15,8 @@ const page = await mk(); await page.goto(URL);
 await page.setInputFiles("#resume-file", ["tests/fixtures/demo-resume.txt", "tests/fixtures/demo-resume.txt", "tests/fixtures/demo-resume.txt"]);
 await page.waitForSelector("#merge-review", { timeout: 30000 });
 console.log("library ATS badges:", await page.locator("text=/ATS (Low|Medium|High)/").allTextContents());
-await page.click("button:has-text('Accept all additions')"); await page.click("button:has-text('Apply')");
+await page.click("button:has-text('Accept all additions')");
+if (await page.locator("button:has-text('Apply'):not([disabled])").count()) await page.click("button:has-text('Apply')"); else await page.click("#merge-review >> button:has-text('Close')");
 await page.click("button:has-text('Analyze a job')"); await page.click("text=Use sample JD"); await page.click("button:has-text('Analyze match')"); await page.waitForSelector("text=Recommendation");
 const unlabeled = async (where) => { const n = await page.evaluate(() => [...document.querySelectorAll("input,select,textarea")].filter(e => e.type!=="hidden" && e.type!=="file" && !e.labels?.length && !e.getAttribute("aria-label") && !e.closest("label")).map(e => e.id || e.placeholder || e.tagName)); if (n.length) problems.push(`UNLABELED(${where}): ${n.join(",")}`); };
 const overflow = async (where) => { const o = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth); if (o > 1) problems.push(`H-OVERFLOW ${o}px (${where})`); };
@@ -23,7 +24,7 @@ await page.click("[role=tab]:has-text('Resume Changes')"); await page.click("but
 await page.click("button:has-text('Accept all safe changes')");
 await page.selectOption("#theme", "accent");
 await page.click("button:has-text('Run ATS check on this PDF')"); await page.waitForSelector("text=ATS parse risk", { timeout: 20000 });
-console.log("ATS panel:", await page.locator("text=ATS parse risk >> xpath=.. >> .rounded").first().textContent().catch(()=>"?"));
+console.log("ATS panel:", await page.evaluate(() => (document.body.innerText.match(/ATS parse risk[^\n]*\n?[^\n]*/) ?? ["?"])[0].replace(/\s+/g, " ")));
 const fitText = await page.locator("text=/Fits \\d+ page/").first().textContent(); console.log("fit:", fitText);
 const tabs = ["Overview","Strategy","Requirements","Skill Match","Resume Changes","Cover Letter","LinkedIn","Recruiter Messages","Interview Prep","Truth Audit","Tracking"];
 for (const w of [1280, 400]) {
@@ -32,7 +33,7 @@ for (const w of [1280, 400]) {
     if (t==="Recruiter Messages" && await page.locator("button:has-text('Draft messages')").count()) { await page.click("button:has-text('Draft messages')"); await page.waitForSelector("text=Connection request"); }
     if (t==="Interview Prep" && await page.locator("button:has-text('Build interview prep')").count()) { await page.click("button:has-text('Build interview prep')"); await page.waitForSelector("text=Topic likelihood"); }
     await overflow(`${t}@${w}`); if (w===1280) await unlabeled(t); }
-  for (const v of ["Profile","Analyze a job","Applications","Versions","Analytics","Presentation","Settings"]) { await page.click(`nav >> button:has-text('${v}')`); await page.waitForTimeout(150); await overflow(`${v}@${w}`); if (w===1280) await unlabeled(v); await page.screenshot({ path: `ui-${v.replace(/\W/g,"")}-${w}.png`, fullPage: false }); }
+  for (const v of ["Profile","Analyze a job","Applications","Versions","Analytics","Presentation","Settings"]) { await page.click(`nav >> button:has-text('${v}')`); await page.waitForTimeout(150); await overflow(`${v}@${w}`); if (w===1280) await unlabeled(v); await page.screenshot({ path: `${process.env.SHOTS ?? "."}/ui-${v.replace(/\W/g,"")}-${w}.png`, fullPage: false }); }
   await page.click("nav >> button:has-text('Applications')"); await page.click("table button");
 }
 // settings: weights + vocab
@@ -41,5 +42,5 @@ await page.fill("#v-c", "Zeta Harness"); await page.fill("#v-a", "ZetaH"); await
 await page.fill("#v-c", "UVM"); await page.click("button:has-text('Add term')"); await page.waitForSelector("text=already exists");
 console.log("vocab add/clash OK");
 // dark mode
-{ const dp = await mk({ dark: true }); await dp.goto(URL); await dp.click("button:has-text('Load demo profile')"); await dp.screenshot({ path: "ui-dark.png" }); }
+{ const dp = await mk({ dark: true }); await dp.goto(URL); await dp.click("button:has-text('Load demo profile')"); await dp.screenshot({ path: `${process.env.SHOTS ?? "."}/ui-dark.png` }); }
 console.log("PROBLEMS:", problems.length ? problems : "none"); await b.close();

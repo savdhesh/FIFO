@@ -1,6 +1,6 @@
 import type { EvidenceRef, Profile, Role } from "./types";
 import { ontology } from "./ontology/ontology";
-import { totalYears } from "./parsing/dates";
+import { parseYM, totalYears } from "./parsing/dates";
 
 export const roleLabel = (r: Role) => [r.title || "Role", r.employer].filter(Boolean).join(" @ ");
 
@@ -53,6 +53,20 @@ export function buildIndex(profile: Profile): ProfileIndex {
   const allText = items.map((i) => i.text).join("\n") + "\n" + profile.roles.map((r) => `${r.title} ${r.employer} ${r.client} ${r.location}`).join("\n") +
     "\n" + profile.education.map((e) => `${e.degree} ${e.university} ${e.specialization}`).join("\n") + "\n" + profile.certifications.join("\n") + "\n" + profile.publications.join("\n");
   return { profile, terms, evidence, items, allText, years };
+}
+
+/** Canonical terms evidenced in the most recent role (current role, else latest end date). Used for "where my current work is" wording. */
+/** Most recent role: current first, then latest end date, then latest start date (dates compared as dates, not strings). */
+export function latestRole(profile: Profile): Role | undefined {
+  const ym = (s: string, end: boolean) => { const t = s.trim(); if (end && (!t || /present|current|now/i.test(t))) return 1e9; const d = parseYM(t, end); return d ? d.y * 12 + d.m : 0; };
+  return [...profile.roles].sort((a, b) => ym(b.endDate, true) - ym(a.endDate, true) || ym(b.startDate, false) - ym(a.startDate, false))[0];
+}
+
+export function recentTerms(profile: Profile): Set<string> {
+  const latest = latestRole(profile);
+  if (!latest) return new Set();
+  const text = [...roleBullets(latest), latest.title, ...latest.tools, ...latest.technologies, ...latest.protocols, ...latest.methodologies].join("\n");
+  return new Set(ontology.findTerms(text).map((h) => h.canonical));
 }
 
 export const toEvidenceRef = (e: EvidenceItem): EvidenceRef => ({ roleId: e.roleId, roleLabel: e.roleLabel, field: e.field, text: e.text });

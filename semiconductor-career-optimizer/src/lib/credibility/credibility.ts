@@ -28,7 +28,9 @@ export function auditCredibility(profile: Profile, now = new Date()): Issue[] {
   const undemonstrated = new Set<string>();
   for (const [cat, vals] of Object.entries(profile.skills)) for (const v of vals) for (const h of ontology.findTerms(v)) {
     if (SKIP.has(h.canonical)) continue;
-    if (!(idx.evidence.get(h.canonical) ?? []).some((e) => e.kind === "bullet")) undemonstrated.add(h.canonical);
+    // A bullet showing a child term ("Ethernet MAC verification") demonstrates the parent ("Ethernet").
+    const family = [h.canonical, ...ontology.entries.filter((e) => e.parent?.toLowerCase() === h.canonical.toLowerCase()).map((e) => e.canonical)];
+    if (!family.some((t) => (idx.evidence.get(t) ?? []).some((e) => e.kind === "bullet"))) undemonstrated.add(h.canonical);
     void cat;
   }
   if (undemonstrated.size) add({ severity: "medium", area: "Skills", message: `Listed in skills but no role bullet demonstrates: ${[...undemonstrated].slice(0, 8).join(", ")}${undemonstrated.size > 8 ? "…" : ""}.`, fix: "Add a bullet that shows real use of each, or remove the skill. Recruiters and interviewers test skill-list claims." });

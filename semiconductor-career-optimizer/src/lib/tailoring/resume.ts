@@ -1,6 +1,6 @@
 import type { ChangeProposal, MatchResult, ParsedJD, Profile, Settings, TailoredResume, ClaimStatus } from "../types";
 import { ontology } from "../ontology/ontology";
-import { buildIndex, roleBullets, type ProfileIndex } from "../profile-index";
+import { latestRole, buildIndex, roleBullets, type ProfileIndex } from "../profile-index";
 import { classifyBullet } from "../matching/bullets";
 import { checkClaim, auditProse } from "../truth/truth";
 import { formatRange } from "../parsing/dates";
@@ -20,7 +20,7 @@ const worst = (a: ClaimStatus[]) => a.reduce((w, s) => (rank[s] > rank[w] ? s : 
 export function matchedJdTerms(jd: ParsedJD, match: MatchResult) {
   return match.requirements
     .filter((m) => m.matchedTerms.length && (m.matchType === "exact" || m.matchType === "equivalent"))
-    .map((m) => ({ term: m.requirement, w: IMPORTANCE_W[m.importance] * (1 + (jd.keywordFrequency[m.requirement] ?? 0) * 0.3), type: m.type }))
+    .map((m) => ({ term: m.requirement, w: IMPORTANCE_W[m.importance] * (1 + (jd.keywordFrequency[m.requirement] ?? 0) * 0.3), type: m.type, demonstrated: m.score >= 0.9 }))
     .sort((a, b) => b.w - a.w);
 }
 
@@ -77,8 +77,8 @@ export function tailorResume(
   const headlineTerms = matched.filter((m) => !(m.term === "Design Verification" && /verification/i.test(titleOfLatest))).filter((m) => !["leadership", "management", "communication", "customer", "experience", "education"].includes(m.type)).slice(0, 5).map((m) => m.term);
 
   // Headline: real latest title + matched differentiators. Never adopts a title the candidate has not held.
-  const latest = [...profile.roles].sort((a, b) => (b.startDate > a.startDate ? 1 : -1))[0];
-  const latestTitle = profile.roles[0]?.title || latest?.title || "Verification Engineer";
+  const latest = latestRole(profile);
+  const latestTitle = latest?.title || profile.roles[0]?.title || "Verification Engineer";
   const headline = [latestTitle, ...headlineTerms].join(" | ");
   const hCheck = checkClaim(headline, { index: idx, allowedNames: allowed });
   const headlineId = addChange({ section: "headline", original: latestTitle, proposed: headline, reason: `Headline leads with your actual title and the JD terms you can evidence (${headlineTerms.join(", ")}).`, evidence: `Title: ${latestTitle}` }, hCheck.status, hCheck.hallucination);
@@ -87,7 +87,8 @@ export function tailorResume(
   const years = Math.floor(idx.years);
   const sentences: string[] = [];
   sentences.push(`${latestTitle.replace(/^(?:a|an)\s+/i, "")} with ${years ? `${years}+ years` : "experience"} in ${domainPhrase(idx)}.`);
-  const techTerms = matched.filter((m) => ["language", "methodology", "protocol", "processor", "assertion", "coverage", "simulator", "formal-tool"].includes(m.type)).slice(0, 7).map((m) => m.term);
+  // "Hands-on" only for terms a role bullet demonstrates; skills-section-only terms stay in competencies.
+  const techTerms = matched.filter((m) => m.demonstrated && ["language", "methodology", "protocol", "processor", "assertion", "coverage", "simulator", "formal-tool"].includes(m.type)).slice(0, 7).map((m) => m.term);
   if (techTerms.length) sentences.push(`Hands-on experience with ${list(techTerms)}.`);
   const practice = matched.filter((m) => ["architecture", "planning", "debugging", "leadership"].includes(m.type)).slice(0, 4).map((m) => m.term.toLowerCase());
   if (practice.length) sentences.push(`Background includes ${list(practice)}.`);

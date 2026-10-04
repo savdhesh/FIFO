@@ -1,5 +1,5 @@
 import type { ClaimCheck, MatchResult, ParsedJD, Profile, Settings } from "../types";
-import { buildIndex, type ProfileIndex } from "../profile-index";
+import { buildIndex, recentTerms, type ProfileIndex } from "../profile-index";
 import { auditProse, sanitizeProse } from "../truth/truth";
 import { countryStyle } from "../countries";
 import { matchedJdTerms } from "./resume";
@@ -63,7 +63,7 @@ export function generateCoverLetter(profile: Profile, jd: ParsedJD, match: Match
   const nTech = 3;
   for (let i = 0; i < nTech; i++) { const f = pickFp(); if (f) tech.push(f); }
   const buildP2 = () => tech.length
-    ? `The closest overlap with your requirements is hands-on verification work. ${tech.map((s, i) => `${i >= 2 ? s.replace(/^I /, "I also ") : s}.`).join(" ")}`
+    ? `The closest overlap with your requirements is hands-on verification work. ${tech.map((s, i) => `${i === 2 ? s.replace(/^I /, "I also ") : s}.`).join(" ")}`
     : `My background aligns with the posting on ${list(techTerms.slice(0, 3)) || "verification"}.`;
   let p2 = buildP2();
   const p3parts = [archFp, leadFp].filter(Boolean) as string[];
@@ -78,11 +78,12 @@ export function generateCoverLetter(profile: Profile, jd: ParsedJD, match: Match
     ? `Day to day this has meant ${tools.length ? `working in ${list(tools)}` : ""}${tools.length && protos.length ? " and " : ""}${protos.length ? `verifying ${list(protos)} interfaces` : ""}.`
     : "";
   // P4: why this role (uses only JD text) + closing
-  const focus = [...jd.domainExpectations, ...jd.requirements.filter((r) => r.importance === "mandatory" && ["domain", "processor"].includes(r.type)).map((r) => r.text)].filter((t) => idx.terms.has(t));
+  const recent = recentTerms(profile);
+  const focus = [...jd.domainExpectations, ...jd.requirements.filter((r) => r.importance === "mandatory" && ["domain", "processor"].includes(r.type)).map((r) => r.text)].filter((t) => recent.has(t));
   const focusUniq = [...new Set(focus)].slice(0, 2);
   const respTerms = matched.filter((m) => ["architecture", "planning", "debugging", "coverage"].includes(m.type)).map((m) => m.term.toLowerCase()).slice(0, 4);
   const pResp = respTerms.length ? ` The responsibilities you describe, including ${list(respTerms)}, are areas I work in directly.` : "";
-  const p4 = `${role} ${company ? `at ${company} ` : ""}is a logical next step${focusUniq.length ? `: the posting centres on ${list(focusUniq)}, which is where my recent work sits` : ""}. I would welcome a technical discussion on how my verification background fits your team's priorities.${pResp}`;
+  const p4 = `${role === "this role" ? "This role" : `The ${role} role`}${company ? ` at ${company}` : ""} fits my background closely${focusUniq.length ? `: the posting focuses on ${list(focusUniq)}, which is where my current work sits` : ""}.${pResp} I would welcome a technical discussion on how my verification background fits your team's priorities.`;
 
   const prefHits = match.requirements.filter((m) => m.importance === "preferred" && (m.matchType === "exact" || m.matchType === "equivalent") && m.matchedTerms.length).map((m) => m.requirement).slice(0, 4);
   const pPref = prefHits.length ? ` My experience with ${list(prefHits)} also overlaps with the preferred qualifications in the posting.` : "";

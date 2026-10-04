@@ -115,7 +115,9 @@ export function planInterview(profile: Profile, jd: ParsedJD, match: MatchResult
     return { id: `d-${hash(b)}`, topic: "Your resume", level, levelName: LEVEL_NAMES[level], q, points, stance: "strength", evidence: [{ label: roleLabel(r), text: b }], source: "resume", whyLikely: "Interviewers verify claims stated on your resume. Answer only from what you actually did." };
   });
 
-  // Gap questions: be honest, bridge, and show a ramp-up path.
+  // Gap questions: be honest, bridge, and show a ramp-up path. Tools get "have you worked with"; concepts get "how much experience".
+  const skillOnly = (m: MatchResult["requirements"][number]) => m.matchType === "exact";
+  const isTool = (t: string) => ["simulator", "formal-tool", "tool", "debug-tool", "scripting", "language", "protocol"].includes(t);
   const gapQuestions: PlannedQ[] = match.requirements
     .filter((m) => m.gap !== "none" && m.matchedTerms.length && m.importance !== "boilerplate")
     .sort((a, b) => IMP[b.importance] - IMP[a.importance]).slice(0, 6)
@@ -124,11 +126,14 @@ export function planInterview(profile: Profile, jd: ParsedJD, match: MatchResult
       const level: Level = m.importance === "mandatory" ? Math.max(2, L - 1) as Level : 2;
       return {
         id: `g-${hash(m.requirement)}`, topic: m.requirement, level, levelName: LEVEL_NAMES[level],
-        q: m.gapKind === "presentation-gap" ? `The job asks for ${show(m.requirement)}. Tell me about your experience with it.` : `Have you worked with ${show(m.requirement)}? How would you get productive on it?`,
+        q: skillOnly(m) ? `Your resume lists ${show(m.requirement)}. Walk me through a project where you used it.`
+          : m.gapKind === "presentation-gap" ? `The job asks for ${show(m.requirement)}. Tell me about your experience with it.`
+          : isTool(m.type) ? `Have you worked with ${show(m.requirement)}? How would you get productive on it?`
+          : `How much ${show(m.requirement)} experience do you have, and how would you close the gap?`,
         points: ["Answer the question asked: yes, partly, or no", via ? `Bridge with your real related work (${show(via)})` : "Bridge with the closest real work you have done", "Give a concrete 30/60/90-day ramp-up plan"],
-        stance: m.gapKind === "presentation-gap" ? "related" : "gap", evidence: m.evidence.filter((e) => e.field === "bullet").slice(0, 2).map((e) => ({ label: e.roleLabel, text: e.text })), source: "gap",
+        stance: m.gapKind === "presentation-gap" || skillOnly(m) ? "related" : "gap", evidence: m.evidence.filter((e) => e.field === "bullet").slice(0, 2).map((e) => ({ label: e.roleLabel, text: e.text })), source: "gap",
         whyLikely: `JD ${m.importance} requirement with ${m.gapKind === "presentation-gap" ? "a presentation gap (the work may exist but the resume does not show it)" : "no direct evidence in your profile"}`,
-        honestyNote: m.gapKind === "presentation-gap" ? `If you did this work, say so with a specific example; if you only did related work, say that.` : `Do not claim ${show(m.requirement)}. Say what you have done that is closest and how you would ramp up.`,
+        honestyNote: skillOnly(m) ? `Be ready with one concrete example; if your use of ${show(m.requirement)} was minor, say so.` : m.gapKind === "presentation-gap" ? `If you did this work, say so with a specific example; if you only did related work, say that.` : `Do not claim ${show(m.requirement)}. Say what you have done that is closest and how you would ramp up.`,
       } as PlannedQ;
     });
 
