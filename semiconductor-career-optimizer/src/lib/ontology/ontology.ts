@@ -16,6 +16,8 @@ export interface TermHit { canonical: string; surface: string; index: number; co
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+const NOT_TERMS = [/electronics?\s*(?:&|and)\s*(?:tele)?communications?(?:\s+engineering)?/gi, /information\s*(?:&|and)\s*communications?\s+technology/gi];
+
 export class Ontology {
   readonly entries!: VocabEntry[];
   private byCanonical = new Map<string, VocabEntry>();
@@ -66,6 +68,8 @@ export class Ontology {
   /** Find all ontology terms in text. Longer aliases claim their span so "Questa Formal" is not also "Questa". */
   findTerms(text: string): TermHit[] {
     const claimed: [number, number][] = [];
+    // Phrases that contain a term but are not that skill: degree names ("Electronics & Communication Engineering").
+    for (const re of NOT_TERMS) { re.lastIndex = 0; for (const m of text.matchAll(re)) claimed.push([m.index!, m.index! + m[0].length]); }
     const hits: TermHit[] = [];
     for (const m of this.matchers) {
       m.re.lastIndex = 0;

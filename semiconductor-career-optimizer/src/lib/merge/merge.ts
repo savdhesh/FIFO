@@ -46,9 +46,18 @@ const roleLabel = (r: Role) => [r.title || "Role", r.employer].filter(Boolean).j
 const nums = (s: string) => (s.match(/\d+(?:\.\d+)?\s?%?/g) ?? []).map((x) => x.replace(/\s/g, "")).sort().join(",");
 const termSet = (s: string) => new Set(ontology.findTerms(s).map((h) => h.canonical));
 
+const sameStart = (a: Role, b: Role) => { const x = span(a), y = span(b); return !!x && !!y && Math.abs(x[0] - y[0]) <= 1; };
 function matchRole(base: Role[], r: Role): Role | undefined {
-  return base.find((b) => (sameEmployer(b.employer, r.employer) && overlap(b, r)) || (!b.employer && !r.employer && b.title && jaccard(b.title, r.title) > 0.6 && overlap(b, r)));
+  return base.find((b) => (sameEmployer(b.employer, r.employer) && overlap(b, r)) || (!b.employer && !r.employer && b.title && jaccard(b.title, r.title) > 0.6 && overlap(b, r)))
+    // The same job written differently in two resumes ("Architect, Design & Verification" vs "Consultant, WaferCo"): same start month.
+    ?? base.find((b) => sameStart(b, r) && (jaccard(b.title, r.title) > 0.3 || !b.employer || !r.employer || sameEmployer(b.employer, r.employer) || overlapSpan(b, r) >= 6));
 }
+const overlapSpan = (a: Role, b: Role) => { const x = span(a), y = span(b); return x && y ? Math.min(x[1], y[1]) - Math.max(x[0], y[0]) : -1; };
+const tokens = (s: string) => new Set(s.toLowerCase().match(/[a-z0-9+#]{3,}/g) ?? []);
+/** Share of the shorter bullet's words found in the longer one: catches reworded copies that Jaccard misses. */
+function containment(a: string, b: string) { const x = tokens(a), y = tokens(b); let i = 0; for (const w of x) if (y.has(w)) i++; return i / Math.max(1, Math.min(x.size, y.size)); }
+const skillKey = (v: string) => v.replace(/\s*\([^)]*\)/, "").toLowerCase().replace(/[^a-z0-9+#]/g, "");
+const uniKey = (u: string) => u.toLowerCase().replace(/[^\p{L}0-9]/gu, "");
 
 export function mergeResumes(sources: SourceResume[], currentBase?: Profile | null): MergeReport {
   if (!sources.length && !currentBase) throw new Error("Upload at least one resume");
@@ -92,15 +101,15 @@ export function mergeResumes(sources: SourceResume[], currentBase?: Profile | nu
       for (const f of ["title", "employer", "location", "startDate", "endDate", "employmentType", "client", "teamSize", "leadership", "technicalOwnership", "architectureOwnership", "customerFacing"] as const) {
         const nv = r[f], cv = m[f];
         if (nv && !cv) { m[f] = nv; add({ kind: "field-fill", group, label: f, source: src.name, proposed: nv, safe: true, payload: { roleId: m.id, field: f, value: nv } }); }
-        else if (nv && cv && nv.trim().toLowerCase() !== cv.trim().toLowerCase() && ["title", "startDate", "endDate", "teamSize"].includes(f))
-          add({ kind: "conflict", group, label: f, source: src.name, current: cv, proposed: nv, note: f === "title" ? "Title differs between resumes (promotion, or a rewording?). Pick what is accurate." : "Differs between resumes. Pick what is accurate.", safe: false, payload: { scope: "role", roleId: m.id, field: f, value: nv } });
+        else if (nv && cv && nv.trim().toLowerCase() !== cv.trim().toLowerCase() && ["title", "employer", "startDate", "endDate", "teamSize"].includes(f) && !(f === "employer" && sameEmployer(nv, cv)))
+          add({ kind: "conflict", group, label: f, source: src.name, current: cv, proposed: nv, note: f === "title" ? "Title differs between resumes (promotion, or a rewording?). Pick what is accurate." : f === "employer" ? "Employer differs for the same dates (a department or client in one resume?). Pick the company you were employed by." : "Differs between resumes. Pick what is accurate.", safe: false, payload: { scope: "role", roleId: m.id, field: f, value: nv } });
       }
       // bullets
       for (const [fld, arr] of [["responsibilities", r.responsibilities], ["achievements", r.achievements]] as const) {
         for (const b of arr) {
           const existing = [...m.responsibilities, ...m.achievements];
           let best = 0, bestB = "";
-          for (const e of existing) { const j = jaccard(e, b); if (j > best) { best = j; bestB = e; } }
+          for (const e of existing) { const j = Math.max(jaccard(e, b), containment(e, b) >= 0.75 ? 0.6 : 0); if (j > best) { best = j; bestB = e; } }
           if (best >= 0.5) {
             // Same bullet with different numbers is a conflict even when the wording is identical (tokens ignore digits).
             const metricDiff = nums(b) !== nums(bestB) && (nums(b) || nums(bestB));
@@ -121,10 +130,11 @@ export function mergeResumes(sources: SourceResume[], currentBase?: Profile | nu
       }
     }
     for (const cat of Object.keys(sp.skills) as (keyof Profile["skills"])[]) {
-      const fresh = sp.skills[cat].filter((t) => !work.skills[cat].some((x) => x.toLowerCase() === t.toLowerCase()));
+      const all = Object.values(work.skills).flat().map(skillKey);
+      const fresh = [...new Map(sp.skills[cat].filter((t) => !all.includes(skillKey(t))).map((t) => [skillKey(t), t])).values()];
       if (fresh.length) { work.skills[cat].push(...fresh); add({ kind: "skill-new", group: "Skills", label: cat, source: src.name, proposed: fresh.join(", "), safe: true, payload: { category: cat, terms: fresh } }); }
     }
-    for (const e of sp.education) if (!work.education.some((x) => sameEmployer(x.university, e.university) && jaccard(x.degree, e.degree) > 0.4)) { work.education.push(e); add({ kind: "edu-new", group: "Education", label: "Education", source: src.name, proposed: [e.degree, e.university, e.year].filter(Boolean).join(", "), safe: true, payload: e }); }
+    for (const e of sp.education) if (!work.education.some((x) => (uniKey(x.university) === uniKey(e.university) || sameEmployer(x.university, e.university)) && (!x.degree || !e.degree || jaccard(x.degree, e.degree) > 0.4 || x.year === e.year))) { work.education.push(e); add({ kind: "edu-new", group: "Education", label: "Education", source: src.name, proposed: [e.degree, e.university, e.year].filter(Boolean).join(", "), safe: true, payload: e }); }
     for (const c of sp.certifications) if (!work.certifications.some((x) => jaccard(x, c) > 0.7)) { work.certifications.push(c); add({ kind: "cert-new", group: "Certifications", label: "Certification", source: src.name, proposed: c, safe: true, payload: c }); }
     for (const c of sp.publications) if (!work.publications.some((x) => jaccard(x, c) > 0.7)) { work.publications.push(c); add({ kind: "pub-new", group: "Publications", label: "Publication / patent", source: src.name, proposed: c, safe: true, payload: c }); }
     for (const a of sp.achievements ?? []) if (!(work.achievements ?? []).some((x) => jaccard(x, a) > 0.7)) { (work.achievements ??= []).push(a); add({ kind: "achievement-new", group: "Key achievements", label: "Achievement", source: src.name, proposed: a, safe: true, payload: a }); }

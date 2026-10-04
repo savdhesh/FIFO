@@ -1,0 +1,27 @@
+Riya Fictional
+riya.fictional@example.com | +91 98000 11111 | Pune, India
+
+SUMMARY
+Verification architect and team lead, 14+ years across SoC, IP and subsystem verification.
+
+SKILLS
+SystemVerilog, UVM, Verilog, Python, Perl
+Simulators: VCS, Xcelium, Questa
+Protocols: AXI, AHB, APB, PCIe
+
+EXPERIENCE
+Senior Verification Architect / Tech Lead, Design & Verification | 04/2024 – Present | India
+• Architected a scalable UVM verification environment with layered sequences, protocol monitors, PTB traffic generators and scoreboards for coverage-driven sign-off.
+• Defined A-sample bring-up strategy with post-silicon validation teams, covering packet visibility and log decoding.
+• Authored 300+ pages of architecture specs, verification plans and integration guides.
+
+Lead Engineer, Kestrel Devices | 01/2020 – 06/2021 | India
+• Owned SoC-level verification of the camera subsystem for a multimedia SoC, driving verification strategy, testbench bring-up and coverage closure through delivery.
+• Implemented PSS-based stimulus and contributed to formal verification and emulation.
+
+EDUCATION
+Master of Science, Example Universität, 2014
+Example Universität
+Example Universität
+B.E. / B.Tech
+AES-GCM / GHASH: Completely absent. Cannot be claimed. Prepare honest positioning: 'I have owned the interface specification.'

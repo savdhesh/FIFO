@@ -74,7 +74,7 @@ Without any API keys it runs with `AI_PROVIDER=mock`: deterministic, offline, no
 ### Tests
 ```bash
 # unit + audit tests (browser end-to-end checks are in e2e/)
-npm test      # 234 tests: ontology integrity, scoring, truth validation, parsers + layout corpus, merge, deck, ATS, credibility, cross-product truth audit, exports
+npm test      # 250 tests: ontology integrity, scoring, truth validation, parsers + layout corpus, merge, deck, ATS, credibility, cross-product truth audit, exports
 npm run lint  # tsc --noEmit
 ```
 

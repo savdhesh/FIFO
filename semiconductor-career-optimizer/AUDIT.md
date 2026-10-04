@@ -11,7 +11,7 @@ Scope: the Claude artifact (`artifact/`, built to `dist/artifact.html`) and the 
 5. **Gold-set evaluation** (`eval/`, `npm run eval`, floors in `tests/eval.test.ts`): accuracy measured on unseen inputs with a holdout split. Baseline, fixes and open failures are in [eval/README.md](eval/README.md). The fixes are not repeated in the table below.
 
 ## Defects found and fixed
-Rows 19–34 are from the third audit (generated-output review of every engine on the demo profile against 9 job descriptions, plus a docs-vs-code check).
+Rows 35–47 come from a real user's generated output (two resumes merged, exported as PDF and DOCX); fictional fixtures `l-table-footer-wraps.txt` and `l2-same-person-modern.txt` reproduce each structure. Rows 19–34 are from the third audit (generated-output review of every engine on the demo profile against 9 job descriptions, plus a docs-vs-code check).
 
 | # | Finding | Fix |
 |---|---|---|
@@ -49,6 +49,19 @@ Rows 19–34 are from the third audit (generated-output review of every engine o
 | 32 | Physical-design jobs: no PD vocabulary, so the engine saw almost no requirements and said "no critical requirement missing" (LOW PRIORITY). | Small PD vocabulary added; the PD control job now scores DO NOT APPLY with its PD gaps listed. |
 | 33 | Gap interview questions read "Have you worked with People Management?" | Tools keep that form; concepts get "How much X experience do you have…". |
 | 34 | Docs: 15+ stale statements (term/test/question counts, dropped data model, a 409 export route that no longer exists, rate-limit list, "not built" features that exist, pdfkit as the app PDF engine). | README/AUDIT corrected. |
+| 35 | Real-resume review (a user's merged output, DOCX + PDF): PDF line-end hyphenation survived as "re- gression", "vali- dation". | Hyphen splits rejoined using the document's own vocabulary; compound tails ("corner-case", "sign-off") and suspended hyphens ("pre- to post-") kept. |
+| 36 | Wrapped bullet lines starting with a capital ("PTB/TDD traffic generators…") became separate bullets, which tailoring then reordered into nonsense. | Continuation detection: dangling connector/comma, unfinished bullet in a bulleted list; a capitalised verb still starts a new bullet. |
+| 37 | jsPDF's built-in fonts encode Windows-1252 only: one "│" or emoji turned a whole line into "C o n s u l t a n t E n g i n e e r … % +P". | PDF text mapped/stripped to the encodable set; pictographs removed at parse and in DOCX. |
+| 38 | Table-style resumes ("Designation" / "Company" / "Duration" on their own lines, or inline without colons) produced labels as titles and bullets, and "Not mentioned" titles. | Label blocks rebuilt into a role header + project line; values must fit their label; empty markers ignored. |
+| 39 | Contact footers and page markers ("C-… Colony ● phone ● email", "P a g e \| 2") landed inside roles; the address became a skill ("C-314"). | Page furniture dropped; a skill item must be mostly a recognised term. |
+| 40 | Skill-table sub-labels rode along ("Languages System Verilog", "Simulation & Debug VCS"); job titles and soft skills were listed as skills. | Label stripped when only terms follow it; titles/soft skills rejected; qualifiers like "(exposure)" kept. |
+| 41 | Merge matched roles only by employer name, so the same job written as "Architect, Design & Verification" and "Consultant, WaferCo" became two roles; reworded bullets were re-added. | Roles also match by start month; departments are not employers; employer disagreements are a conflict to resolve; reworded bullets detected by word containment. |
+| 42 | Education: "Scrum Master" parsed as a master's degree; university lines repeated 15×; interview-prep notes accepted as education. | Degree regex requires "Master of/Master's"; repeats folded; commentary rejected; certifications moved to Certifications; placeholders ("B.E. / B.Tech") dropped. |
+| 43 | Project/programme lines ("Automotive SerDes Alliance (ASA) Verification IP") were bullets. | Kept as the role's project line, shown under the role header in preview, PDF and DOCX. |
+| 44 | "Qualcomm India Pvt. Ltd." ended with a dot, so the header was read as a sentence and the role lost title and employer. | Company-suffix dots are not sentence ends. |
+| 45 | Generated skills listed one skill several ways ("AHB" / "AMBA AHB", "GLS" / "Gate-Level Simulation", "SoC" / "SoC Verification"). | One entry per concept; distinct protocol variants (QSPI vs SPI, I3C vs I2C) and qualifiers kept. |
+| 46 | A non-resume document (interview notes) could be added to the library and merged. | Documents with no dated roles are refused with an explanation. |
+| 47 | "Electronics & Communication" (a degree) counted as the soft skill "Communication" in truth checks. | Degree names excluded from term matching. |
 
 ## Spec coverage (brief sections)
 Legend: ✅ done · 🟡 partial · ⛔ not built
@@ -83,7 +96,7 @@ Legend: ✅ done · 🟡 partial · ⛔ not built
 | 32 | Demo data | ✅ | Fictional. |
 | 33 | Security | ✅ | Server app. |
 | 35 | Acceptance scenario | ✅ | `tests/acceptance.test.ts`. |
-| 37 | Tests, README, schema, migrations, seed | ✅ | 234 unit tests + browser e2e scripts. |
+| 37 | Tests, README, schema, migrations, seed | ✅ | 250 unit tests + browser e2e scripts. |
 
 ## Known limits that remain
 - **Separate GitHub repo**: the GitHub integration returned 403 on repo creation; the project is a self-contained folder in `savdhesh/FIFO`.

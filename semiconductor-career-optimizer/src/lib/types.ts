@@ -182,7 +182,7 @@ export interface TailoredResume {
   summary: string;
   competencies: string[];
   skills: { label: string; items: string[] }[];
-  experience: { roleId: string; title: string; employer: string; location: string; dates: string; bullets: { text: string; changeId?: string }[] }[];
+  experience: { roleId: string; title: string; employer: string; location: string; dates: string; subtitle?: string; bullets: { text: string; changeId?: string }[] }[];
   education: string[];
   projects: { name: string; sub: string; bullets: string[] }[];
   certifications: string[];

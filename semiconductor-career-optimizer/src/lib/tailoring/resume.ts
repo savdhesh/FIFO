@@ -102,10 +102,36 @@ export function tailorResume(
 
   // Skills (profile content only; JD-relevant items first)
   const LABELS: Record<string, string> = { languages: "HDL / Languages", verification: "Verification", formal: "Formal Verification", processor: "Processor / ISA", protocols: "Interfaces / Protocols", domains: "Domains", tools: "Tools", methodologies: "Methodologies" };
-  const skills = Object.entries(profile.skills).filter(([, v]) => v.length).map(([k, v]) => ({
+  // One entry per skill however it was written across merged resumes ("AHB" / "AMBA AHB", "GLS" / "Gate-Level Simulation"):
+  // same ontology concept = same skill, except tools, which are distinct products. A qualified entry ("formal verification (exposure)")
+  // wins over a bare duplicate so the resume never drops an honest qualifier. Fragments too generic to be a skill are dropped.
+  const GENERIC = /^(?:soc|ip|memory|subsystems?|formal|verification|design|silicon|chip|debug|automation|low[- ]?power)$/i;
+  const conceptKey = (v: string) => {
+    const bare = v.replace(/\s*\([^)]*\)/, "");
+    const hits = ontology.findTerms(bare);
+    const covered = hits.reduce((n, h) => n + h.surface.length, 0) / Math.max(1, bare.trim().length);
+    const e = hits.length === 1 && covered >= 0.6 ? ontology.get(hits[0].canonical) : undefined;
+    const spelling = `s:${bare.toLowerCase().replace(/[^a-z0-9+#]/g, "")}`;
+    if (!e || ["Tool", "Simulator", "Debug Tool", "Formal Tool"].includes(e.category)) return spelling;
+    // Protocol/ISA aliases can be distinct variants (QSPI vs SPI, I3C vs I2C): collapse only "AMBA AHB" into "AHB" (whole-word containment).
+    if (["Protocol", "Processor", "SerDes", "HDL", "Language"].includes(e.category)) {
+      const words = bare.toLowerCase().split(/[^a-z0-9+#-]+/), canon = e.canonical.toLowerCase();
+      return words.includes(canon) || bare.toLowerCase() === canon ? `c:${e.canonical}` : spelling;
+    }
+    return `c:${e.canonical}`;
+  };
+  const chosen = new Map<string, { cat: string; text: string }>();
+  for (const [k, v] of Object.entries(profile.skills)) for (const x of v) {
+    if (GENERIC.test(x.trim())) continue;
+    const key = conceptKey(x), prev = chosen.get(key);
+    if (!prev) chosen.set(key, { cat: k, text: x });
+    else if (/\(/.test(x) && !/\(/.test(prev.text)) prev.text = x;
+  }
+  const skills = Object.keys(profile.skills).map((k) => ({
     label: LABELS[k] ?? k,
-    items: [...v].sort((a, b) => (bulletRelevance(b, jdWeights) > 0 ? 1 : 0) - (bulletRelevance(a, jdWeights) > 0 ? 1 : 0)),
-  }));
+    items: [...chosen.values()].filter((c) => c.cat === k).map((c) => c.text)
+      .sort((a, b) => (bulletRelevance(b, jdWeights) > 0 ? 1 : 0) - (bulletRelevance(a, jdWeights) > 0 ? 1 : 0)).slice(0, 14),
+  })).filter((g) => g.items.length);
 
   // Experience
   const rewriteMap = new Map<string, BulletRewrite>();
@@ -131,7 +157,7 @@ export function tailorResume(
       const id = addChange({ section: "bullet", roleId: role.id, original: b, proposed: rw.proposed, reason: rw.reason, evidence: rw.evidence ?? b }, status, c.hallucination);
       return { text: rw.proposed, changeId: id };
     });
-    return { roleId: role.id, title: role.title, employer: role.employer, location: role.location, dates: formatRange(role.startDate, role.endDate, style.dates), bullets };
+    return { roleId: role.id, title: role.title, employer: role.employer, location: role.location, dates: formatRange(role.startDate, role.endDate, style.dates), subtitle: role.client || undefined, bullets };
   });
 
   // Major technical projects: your own listed projects, verbatim, for longer resumes only.

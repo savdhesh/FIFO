@@ -103,3 +103,77 @@ describe("profile helpers and checks", () => {
     expect(analyzeMatch(demo, pd).recommendation.verdict).toBe("DO NOT APPLY");
   });
 });
+
+describe("real-world merge of two versions of one resume (table layout + modern layout)", async () => {
+  const { mergeResumes, applyMerge, acceptSafeItems } = await import("@/lib/merge/merge");
+  const { tailorResume } = await import("@/lib/tailoring/resume");
+  const { resumePdf } = await import("../artifact/exporters");
+  const { extractText, getDocumentProxy } = await import("unpdf");
+  const a = parseResumeHeuristic(fs.readFileSync("tests/fixtures/resumes/l-table-footer-wraps.txt", "utf8"));
+  const b = parseResumeHeuristic(fs.readFileSync("tests/fixtures/resumes/l2-same-person-modern.txt", "utf8"));
+  const r = mergeResumes([{ id: "a", name: "table.pdf", profile: a }, { id: "b", name: "modern.docx", profile: b }]);
+  const merged = applyMerge(r.base, acceptSafeItems(r.items));
+
+  it("parses the table layout: four roles, no labels, footers, hyphen splits or split bullets", () => {
+    expect(a.roles.map((x) => `${x.title} @ ${x.employer}`)).toEqual(["Senior Verification Architect @ Orbit Silicon", "Lead Engineer @ Kestrel Devices", "SoC Design Consultant @ NovaChip Semiconductors", "SoC Verification Consultant @ Zephyr Devices"]);
+    const text = JSON.stringify(a.roles);
+    for (const bad of [/Designation|Projects and Responsibilities|"Company"/, /P a g e/, /C-221/, /\w- [a-z]/, /"PTB traffic/]) expect(text).not.toMatch(bad);
+    expect(a.roles[1].achievements).toContain("Silicon Award Recipient");
+  });
+  it("cleans skills and education", () => {
+    expect(a.skills.languages).toEqual(["System Verilog", "Verilog", "C", "Python"]);
+    expect(a.skills.formal).toEqual(["formal verification (exposure)"]);
+    expect(Object.values(a.skills).flat().join(" ")).not.toMatch(/Engineer|Languages |Simulation &|C-221/);
+    expect(a.education.map((e) => e.university)).toEqual(["Example Universität", "Sample University"]);
+    expect(b.education).toHaveLength(1);
+    expect(a.certifications.join(" ")).toMatch(/Scrum Master/);
+  });
+  it("merges the same job written two ways into one role under the real employer", () => {
+    expect(merged.roles.filter((x) => x.startDate.includes("2024"))).toHaveLength(1);
+    // "Design & Verification" is read as a department, so the role keeps the real employer instead of raising a false conflict
+    expect(merged.roles.find((x) => x.startDate.includes("2024"))?.employer).toBe("Orbit Silicon");
+    expect(b.roles[0].employer).toBe("");
+    expect(b.roles[0].client).toMatch(/Design & Verification/);
+    // the reworded camera-subsystem bullet is not added a second time
+    expect(merged.roles.flatMap((x) => [...x.responsibilities, ...x.achievements]).filter((t) => /camera subsystem/i.test(t) && /bring-up/.test(t))).toHaveLength(1);
+    expect(merged.education.length).toBe(2);
+    expect(Object.values(merged.skills).flat().filter((s) => /^system ?verilog$/i.test(s))).toHaveLength(1);
+  });
+  it("exported PDF text has no garbled glyph runs, furniture or duplicated skills", async () => {
+    const j = parseJobDescriptionHeuristic(DEMO_JD_TEXT);
+    const m = analyzeMatch(merged, j);
+    const { tailored } = tailorResume(merged, j, m, SettingsSchema.parse({ length: "3" }));
+    const pdf = resumePdf(tailored, "3");
+    const { text } = await extractText(await getDocumentProxy(new Uint8Array(pdf.data)), { mergePages: true });
+    expect(text).not.toMatch(/(?:\b\w ){6,}/); // letter-spaced runs: "C o n s u l t a n t"
+    expect(text).not.toMatch(/P a g e|Designation|Projects and Responsibilities|C-221|% \+P/);
+    expect(text).toMatch(/Automotive SerDes Link Verification IP/); // project line rendered under its role
+  });
+});
+
+describe("merge: same dates, different employer names", async () => {
+  const { mergeResumes } = await import("@/lib/merge/merge");
+  it("matches by start month and asks which employer is right", () => {
+    const x = parseResumeHeuristic("A\na@example.com\n\nEXPERIENCE\nSoC Specialist, Nordic Radio Oy\n07/2022 – 03/2024 | Finland\n• Owned SoC-top verification for an RF SoC.\n");
+    const y = parseResumeHeuristic("A\na@example.com\n\nEXPERIENCE\nSoC Specialist, Nordic Radio Networks\n07/2022 – 03/2024 | Finland\n• Led sprint planning for the SoC verification team.\n");
+    const z = parseResumeHeuristic("A\na@example.com\n\nEXPERIENCE\nSoC Verification Lead, Polar Systems AB\n07/2022 – 03/2024 | Finland\n• Owned SoC-top verification for an RF SoC.\n");
+    expect(mergeResumes([{ id: "x", name: "x", profile: x }, { id: "y", name: "y", profile: y }]).base.roles).toHaveLength(1);
+    const r = mergeResumes([{ id: "x", name: "x", profile: x }, { id: "z", name: "z", profile: z }]);
+    expect(r.items.filter((i) => i.kind === "role-new")).toHaveLength(0);
+    expect(r.items.some((i) => i.kind === "conflict" && i.label === "employer")).toBe(true);
+  });
+});
+
+
+describe("generated skills section", async () => {
+  const { tailorResume } = await import("@/lib/tailoring/resume");
+  it("one entry per skill across spellings, distinct protocol variants kept, honest qualifiers kept", () => {
+    const p = parseResumeHeuristic("A\na@example.com\n\nSKILLS\nSystemVerilog, System Verilog, UVM\nProtocols: AHB, AMBA AHB, SPI, QSPI, I2C, I3C\nMethods: GLS, Gate-Level Simulation\nFormal, formal verification (exposure)\n\nEXPERIENCE\nDV Engineer, X Corp, Jan 2018 - Present\n- Verified AHB and QSPI controllers with UVM and ran GLS.\n");
+    const j = parseJobDescriptionHeuristic(DEMO_JD_TEXT);
+    const items = tailorResume(p, j, analyzeMatch(p, j), settings).tailored.skills.flatMap((g) => g.items);
+    expect(items.filter((x) => /system ?verilog$/i.test(x))).toHaveLength(1);
+    expect(items.filter((x) => /AHB/.test(x))).toHaveLength(1);
+    expect(items).toEqual(expect.arrayContaining(["SPI", "QSPI", "I2C", "I3C", "formal verification (exposure)"]));
+    expect(items.filter((x) => /^(GLS|Gate-Level Simulation)$/.test(x))).toHaveLength(1);
+  });
+});

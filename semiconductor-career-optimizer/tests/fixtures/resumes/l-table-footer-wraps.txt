@@ -1,0 +1,56 @@
+RIYA FICTIONAL
+Pune, India | riya.fictional@example.com | +91 98000 11111 | linkedin.com/in/riyafictional
+
+PROFESSIONAL SUMMARY
+Verification lead with 14 years in SoC and subsystem verification.
+
+TECHNICAL SKILLS
+Languages System Verilog, Verilog, C, Python
+Verification Methodologies UVM (expert), OVM
+Simulation & Debug VCS, Verdi, Jira
+Formal formal verification (exposure)
+Tools & Environment Git, Perforce, Linux
+Lead Verification Engineer, Team Leadership & Mentorship
+Programming languages Verilog, C-221
+
+PROFESSIONAL EXPERIENCE
+Senior Verification Architect, Orbit Silicon
+04/2024 – Present | India
+Automotive SerDes Link Verification IP
+• Architected a scalable UVM-based verification environment, including layered sequences, protocol monitors,
+PTB traffic generators, scoreboards, and functional coverage, enabling coverage-driven sign-off.
+• Partnered with post-silicon validation teams to define A-sam- ple debug workflows and log decoding.
+• Built and mentored teams from 8 to 20+ engineers, driving coverage closure and re- gression discipline.
+• Achieved functional coverage closure and supported post-silicon vali- dation, uncovering corner- case issues.
+C-221, Example Colony, Pune 411001 ● +91 98000 11111 ● riya.fictional@example.com
+P a g e | 2
+Lead Engineer, Kestrel Devices │ ⭐ Silicon Award Recipient
+01/2020 – 06/2021 | India
+• Owned camera subsystem verification for a multimedia SoC, defining verification strategy, driving testbench bring-up, and closing coverage through delivery.
+• Owned camera subsystem verification for a multimedia SoC, including verification strategy, testbench bring-up, and coverage closure.
+• Led post-silicon validation, developing vectors and supporting on-chip execution and debug.
+
+Designation
+SoC Design Consultant
+Company
+NovaChip Semiconductors
+Duration
+10/2017 – 02/2018
+Projects and Responsibilities
+Industrial Ethernet SoC
+• Developed RGMII and GMII verification agents.
+• Created test patterns for RTL and GLS verification.
+
+Designation SoC Verification Consultant, Company Zephyr Devices
+08/2016 – 10/2017 | India
+Projects and Responsibilities SoC Verification in Automotive Group
+• Verified security modules across multiple SoCs.
+
+EDUCATION
+M.Sc. Mechatronics, Example Universität, 2014
+Example Universität
+B.E. Electronics & Communication, Sample University, 2010
+Sample University
+Scrum Master, Example Institute of Agile
+Example Universität
+not verification. Profile is verification-dominant. This gap will be probed., Example Universität

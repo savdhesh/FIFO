@@ -4,7 +4,7 @@ import { themeById } from "./themes";
 import type { CoverLetter } from "../tailoring/cover-letter";
 
 let FONT = "Calibri";
-const run = (text: string, o: { bold?: boolean; italics?: boolean; size?: number; color?: string } = {}) => new TextRun({ text, font: FONT, size: o.size ?? 21, bold: o.bold, italics: o.italics, color: o.color ?? "111111" });
+const run = (text: string, o: { bold?: boolean; italics?: boolean; size?: number; color?: string } = {}) => new TextRun({ text: text.replace(/\p{Extended_Pictographic}\uFE0F?/gu, ""), font: FONT, size: o.size ?? 21, bold: o.bold, italics: o.italics, color: o.color ?? "111111" });
 const contact = (id: TailoredResume["identity"]) => [id.location, id.email, id.phone, id.linkedin, id.github, id.portfolio].filter(Boolean).join("  |  ");
 
 const numbering = { config: [{ reference: "bullets", levels: [{ level: 0, format: LevelFormat.BULLET, text: "•", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 360, hanging: 240 } } } }] }] };
@@ -26,7 +26,8 @@ export function resumeDoc(r: TailoredResume, themeId?: string): Document {
     heading("Professional Experience");
     for (const e of r.experience) {
       out.push(new Paragraph({ spacing: { before: 120 }, keepNext: true, children: [run([e.title, e.employer].filter(Boolean).join(", "), { bold: true, size: 22 })] }));
-      out.push(new Paragraph({ spacing: { after: 60 }, keepNext: true, children: [run([e.dates, e.location].filter(Boolean).join("  |  "), { italics: true, size: 19, color: "444444" })] }));
+      out.push(new Paragraph({ spacing: { after: e.subtitle ? 0 : 60 }, keepNext: true, children: [run([e.dates, e.location].filter(Boolean).join("  |  "), { italics: true, size: 19, color: "444444" })] }));
+      if (e.subtitle) out.push(new Paragraph({ spacing: { after: 60 }, keepNext: true, children: [run(e.subtitle, { italics: true, size: 19, color: "444444" })] }));
       for (const b of e.bullets) bullet(b.text);
     }
   }

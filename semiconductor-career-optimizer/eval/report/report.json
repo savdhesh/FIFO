@@ -1,7 +1,7 @@
 {
   "goldVersion": 1,
   "goldCommit": "1afdff3",
-  "engineCommit": "9a1ddf3",
+  "engineCommit": "cf4e2ad + uncommitted engine changes",
   "parse": {
     "name": {
       "dev": {
@@ -521,7 +521,7 @@
       "[verdict] p8: got APPLY WITH GAPS (67), acceptable STRONG APPLY / APPLY"
     ],
     "holdout": [
-      "[parse] r3-chen role \"Staff Verification Engineer @ Kestrel Chips Pte Ltd\" employer: got \"Period\", want \"Kestrel Chips Pte Ltd\"",
+      "[parse] r3-chen role \"Staff Verification Engineer @ Kestrel Chips Pte Ltd\" employer: got \"Position\", want \"Kestrel Chips Pte Ltd\"",
       "[parse] r5-eli role \"Senior Formal Verification Engineer @ Falcon Logic\" employer: got \"\", want \"Falcon Logic\"",
       "[parse] r5-eli role \"Verification Engineer @ Osprey Devices\" employer: got \"Osprey Devices (Dallas)\", want \"Osprey Devices\"",
       "[jd] j1-pcie title: got \"Senior Design Verification Engineer – PCIe/CXL\", want \"Senior Design Verification Engineer\"",

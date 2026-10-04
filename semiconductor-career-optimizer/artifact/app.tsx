@@ -138,6 +138,8 @@ function ProfileView({ profile, setProfile, resumes, setResumes, provider, run, 
     const dup = existing.find((r) => r.hash === hash);
     if (dup) return { all: existing, added: false };
     const parsed = await parseResume(provider, text);
+    // Notes, prep documents and job descriptions have no dated roles; merging them pollutes the profile (e.g. education).
+    if (!parsed.profile.roles.length) throw new Error(`${name}: no jobs with dates were found, so this does not look like a resume (or its layout could not be read). Nothing was added. If it is a resume, paste its text instead and check the dates are written like "Jan 2020 – Present".`);
     return { all: [...existing, { id: `res${Date.now().toString(36)}${existing.length}`, name, addedAt: new Date().toISOString(), profile: parsed.profile, ats: atsParse(text, layout), diag: { ...parsed.diag, unplaced: parsed.diag.unplaced }, source: parsed.source, hash }], added: true };
   };
   const afterAdd = (all: Resume[], added: number, skipped: string[]) => {
@@ -285,7 +287,7 @@ function ProfileEditor({ profile: p, setProfile, say, goAnalyze }: { profile: Pr
       {p.roles.map((r, i) => (
         <Card key={r.id} className="space-y-3">
           <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">{r.title || "Role"} {r.employer && `· ${r.employer}`}</h3><button className="text-xs text-red-600 underline" onClick={() => setProfile({ ...p, roles: p.roles.filter((_, j) => j !== i) })}>Remove</button></div>
-          <div className="grid gap-3 md:grid-cols-3">{([["title", "Title"], ["employer", "Employer"], ["client", "Customer / client"], ["location", "Location"], ["startDate", "Start (e.g. Jan 2020)"], ["endDate", "End (or Present)"], ["employmentType", "Employment type"], ["teamSize", "Team size (only if stated)"]] as const).map(([k, l]) => <div key={k}><Label htmlFor={`r${i}-${k}`}>{l}</Label><Input id={`r${i}-${k}`} value={r[k]} onChange={(e) => setRole(i, { [k]: e.target.value } as Partial<Role>)} /></div>)}</div>
+          <div className="grid gap-3 md:grid-cols-3">{([["title", "Title"], ["employer", "Employer"], ["client", "Project / client (shown under the role)"], ["location", "Location"], ["startDate", "Start (e.g. Jan 2020)"], ["endDate", "End (or Present)"], ["employmentType", "Employment type"], ["teamSize", "Team size (only if stated)"]] as const).map(([k, l]) => <div key={k}><Label htmlFor={`r${i}-${k}`}>{l}</Label><Input id={`r${i}-${k}`} value={r[k]} onChange={(e) => setRole(i, { [k]: e.target.value } as Partial<Role>)} /></div>)}</div>
           <div><Label htmlFor={`r${i}-resp`}>Responsibilities (one bullet per line)</Label><Textarea id={`r${i}-resp`} rows={6} value={lines(r.responsibilities)} onChange={(e) => setRole(i, { responsibilities: unLines(e.target.value) })} /></div>
           <div><Label htmlFor={`r${i}-ach`}>Achievements with real metrics (one per line)</Label><Textarea id={`r${i}-ach`} rows={3} value={lines(r.achievements)} onChange={(e) => setRole(i, { achievements: unLines(e.target.value) })} /></div>
           <div className="grid gap-3 md:grid-cols-2">{([["technologies", "Technologies"], ["tools", "Tools"], ["protocols", "Protocols"], ["methodologies", "Methodologies"]] as const).map(([k, l]) => <div key={k}><Label htmlFor={`r${i}-${k}`}>{l} (comma separated)</Label><Input id={`r${i}-${k}`} value={csv(r[k])} onChange={(e) => setRole(i, { [k]: unCsv(e.target.value) } as Partial<Role>)} /></div>)}</div>
@@ -550,7 +552,7 @@ function ResumePreview({ r }: { r: any }) {
       {r.summary && <Sec t="Professional summary"><p>{r.summary}</p></Sec>}
       {r.competencies.length > 0 && <Sec t="Core competencies"><p>{r.competencies.join(" • ")}</p></Sec>}
       <Sec t="Technical skills">{r.skills.map((s: any) => <p key={s.label}><b>{s.label}:</b> {s.items.join(", ")}</p>)}</Sec>
-      <Sec t="Professional experience">{r.experience.map((e: any) => <div key={e.roleId} className="mb-2"><div className="font-semibold">{[e.title, e.employer].filter(Boolean).join(", ")}</div><div className="text-xs italic text-gray-600">{[e.dates, e.location].filter(Boolean).join(" | ")}</div><ul className="list-disc pl-5">{e.bullets.map((b: any, i: number) => <li key={i}>{b.text}</li>)}</ul></div>)}</Sec>
+      <Sec t="Professional experience">{r.experience.map((e: any) => <div key={e.roleId} className="mb-2"><div className="font-semibold">{[e.title, e.employer].filter(Boolean).join(", ")}</div><div className="text-xs italic text-gray-600">{[e.dates, e.location].filter(Boolean).join(" | ")}</div>{e.subtitle && <div className="text-xs italic text-gray-600">{e.subtitle}</div>}<ul className="list-disc pl-5">{e.bullets.map((b: any, i: number) => <li key={i}>{b.text}</li>)}</ul></div>)}</Sec>
       {(r.projects ?? []).length > 0 && <Sec t="Major technical projects">{r.projects.map((p: any) => <div key={p.name} className="mb-2"><div className="font-semibold">{p.name}{p.sub && <span className="font-normal italic text-gray-600"> ({p.sub})</span>}</div><ul className="list-disc pl-5">{p.bullets.map((b: string, i: number) => <li key={i}>{b}</li>)}</ul></div>)}</Sec>}
       {r.education.length > 0 && <Sec t="Education">{r.education.map((e: string, i: number) => <p key={i}>{e}</p>)}</Sec>}
     </div>

@@ -11,6 +11,17 @@ import type { AtsReport } from "../src/lib/ats/ats";
 
 const contact = (id: TailoredResume["identity"]) => [id.location, id.email, id.phone, id.linkedin, id.github, id.portfolio].filter(Boolean).join("  |  ");
 
+/**
+ * jsPDF's built-in fonts encode Windows-1252 only. One character outside it ("│", "⭐", "→") makes jsPDF write the whole line as
+ * spaced-out garbage, so map the common ones and drop the rest.
+ */
+const WIN1252_EXTRA = "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ";
+export function pdfSafe(t: string): string {
+  return t.replace(/[│┃¦]/g, "|").replace(/[●▪■◦○▸►➢✓✔]/g, "•").replace(/[→⇒]/g, "->").replace(/≥/g, ">=").replace(/≤/g, "<=").replace(/[‐‑‒]/g, "-").replace(/[\u2009\u200A\u202F]/g, " ")
+    .replace(/./gsu, (c) => (c <= "\x7e" || (c >= "\xa0" && c <= "\xff") || WIN1252_EXTRA.includes(c) ? c : ""))
+    .replace(/ {2,}/g, " ");
+}
+
 /** Minimal flowing-text writer on jsPDF: single column, Helvetica, real text (ATS-safe). */
 function writer(title: string, font: "helvetica" | "times" = "helvetica") {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -21,7 +32,7 @@ function writer(title: string, font: "helvetica" | "times" = "helvetica") {
   const text = (t: string, o: { size?: number; bold?: boolean; italic?: boolean; indent?: number; gap?: number; color?: number | [number, number, number] } = {}) => {
     const size = o.size ?? 10;
     doc.setFont(font, o.bold ? "bold" : o.italic ? "italic" : "normal").setFontSize(size); if (Array.isArray(o.color)) doc.setTextColor(...o.color); else doc.setTextColor(o.color ?? 17);
-    const lines = doc.splitTextToSize(t, W - (o.indent ?? 0)) as string[];
+    const lines = doc.splitTextToSize(pdfSafe(t), W - (o.indent ?? 0)) as string[];
     for (const l of lines) { need(size * 1.35); doc.text(l, M + (o.indent ?? 0), y + size); y += size * 1.35; }
     y += o.gap ?? 0;
   };
@@ -46,7 +57,8 @@ export function resumePdf(r: TailoredResume, length: string, themeId?: string): 
     section("Professional Experience");
     for (const e of r.experience) {
       w.gap(4); w.text([e.title, e.employer].filter(Boolean).join(", "), { size: base + 0.5, bold: true });
-      w.text([e.dates, e.location].filter(Boolean).join("  |  "), { size: base - 0.5, italic: true, color: 68, gap: 2 });
+      w.text([e.dates, e.location].filter(Boolean).join("  |  "), { size: base - 0.5, italic: true, color: 68, gap: e.subtitle ? 0 : 2 });
+      if (e.subtitle) w.text(e.subtitle, { size: base - 0.5, italic: true, color: 68, gap: 2 });
       for (const b of e.bullets) w.bullet(b.text, base);
     }
   }
